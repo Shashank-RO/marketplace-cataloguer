@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const response = NextResponse.redirect(new URL("/", req.url));
+  const appUrl = process.env.APP_URL || `https://${req.headers.get("host")}`;
+  const response = NextResponse.redirect(`${appUrl}/`);
   response.cookies.set("shopify_token", access_token, { httpOnly: true, maxAge: 60 * 60 * 24 * 30 });
   response.cookies.delete("shopify_oauth_state");
   return response;
