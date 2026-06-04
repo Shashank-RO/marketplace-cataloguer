@@ -17,6 +17,10 @@ export default function Home() {
     setError(null);
     try {
       const res = await fetch(`/api/products?page=${p}`);
+      if (res.status === 401) {
+        window.location.href = "/api/auth";
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setProducts(data.products);

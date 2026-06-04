@@ -32,28 +32,28 @@ export interface ShopifyProduct {
 }
 
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
-const token = process.env.SHOPIFY_ADMIN_TOKEN;
 
-function shopifyFetch(path: string) {
-  if (!domain || !token) throw new Error("Shopify env vars not set");
+export function shopifyFetch(path: string, token?: string) {
+  const t = token || process.env.SHOPIFY_ADMIN_TOKEN;
+  if (!domain || !t) throw new Error("Shopify env vars not set");
   return fetch(`https://${domain}/admin/api/2024-01/${path}`, {
     headers: {
-      "X-Shopify-Access-Token": token,
+      "X-Shopify-Access-Token": t,
       "Content-Type": "application/json",
     },
     cache: "no-store",
   });
 }
 
-export async function fetchProducts(page = 1, limit = 50): Promise<ShopifyProduct[]> {
-  const res = await shopifyFetch(`products.json?limit=${limit}&page=${page}&status=active`);
+export async function fetchProducts(page = 1, limit = 50, token?: string): Promise<ShopifyProduct[]> {
+  const res = await shopifyFetch(`products.json?limit=${limit}&page=${page}&status=active`, token);
   if (!res.ok) throw new Error(`Shopify error ${res.status}`);
   const data = await res.json();
   return data.products;
 }
 
-export async function fetchProduct(id: string): Promise<ShopifyProduct> {
-  const res = await shopifyFetch(`products/${id}.json`);
+export async function fetchProduct(id: string, token?: string): Promise<ShopifyProduct> {
+  const res = await shopifyFetch(`products/${id}.json`, token);
   if (!res.ok) throw new Error(`Shopify error ${res.status}`);
   const data = await res.json();
   return data.product;

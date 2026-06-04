@@ -3,11 +3,13 @@ import { fetchProducts } from "@/lib/shopify";
 
 export async function GET(req: NextRequest) {
   try {
+    const token = req.cookies.get("shopify_token")?.value;
     const page = Number(req.nextUrl.searchParams.get("page") || "1");
-    const products = await fetchProducts(page);
+    const products = await fetchProducts(page, 50, token);
     return NextResponse.json({ products });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = message.includes("401") || message.includes("env") ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

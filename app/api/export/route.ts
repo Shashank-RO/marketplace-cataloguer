@@ -4,13 +4,14 @@ import { buildMyntraWorkbook } from "@/lib/myntra-template";
 
 export async function POST(req: NextRequest) {
   try {
+    const token = req.cookies.get("shopify_token")?.value;
     const { productIds, marketplace } = await req.json();
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json({ error: "No products selected" }, { status: 400 });
     }
 
-    const products = await Promise.all(productIds.map((id: string) => fetchProduct(id)));
+    const products = await Promise.all(productIds.map((id: string) => fetchProduct(id, token)));
 
     let buffer: unknown;
     let filename: string;
