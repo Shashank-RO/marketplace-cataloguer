@@ -46,8 +46,12 @@ export function shopifyFetch(path: string, token?: string) {
 }
 
 export async function fetchProducts(page = 1, limit = 50, token?: string): Promise<ShopifyProduct[]> {
-  const res = await shopifyFetch(`products.json?limit=${limit}&page=${page}&status=active`, token);
-  if (!res.ok) throw new Error(`Shopify error ${res.status}`);
+  const res = await shopifyFetch(`products.json?limit=${limit}&page=${page}`, token);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[shopify] products error ${res.status}:`, body.substring(0, 200));
+    throw new Error(`Shopify error ${res.status}: ${body.substring(0, 100)}`);
+  }
   const data = await res.json();
   return data.products;
 }
