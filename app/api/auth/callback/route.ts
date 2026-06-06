@@ -37,14 +37,8 @@ export async function GET(req: NextRequest) {
   const access_token = tokenData.access_token;
   const appUrl = process.env.APP_URL || `https://${req.headers.get("host")}`;
 
-  const response = NextResponse.redirect(`${appUrl}/`);
-  response.cookies.set("shopify_token", access_token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-    path: "/",
-  });
+  // Redirect to a local token-setter page to avoid cross-site cookie issues
+  const response = NextResponse.redirect(`${appUrl}/api/auth/set-token?token=${access_token}`);
   response.cookies.delete("shopify_oauth_state");
   return response;
 }
