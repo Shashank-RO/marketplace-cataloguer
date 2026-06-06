@@ -9,14 +9,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
+  const [pageIndex, setPageIndex] = useState(0);
   const [search, setSearch] = useState("");
 
-  const loadProducts = useCallback(async (p: number) => {
+  const loadProducts = useCallback(async (c: string | null) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/products?page=${p}`);
+      const url = c ? `/api/products?cursor=${c}` : `/api/products`;
+      const res = await fetch(url);
       if (res.status === 401) {
         window.location.href = "/api/auth";
         return;
@@ -24,6 +28,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setProducts(data.products);
+      setNextCursor(data.nextCursor);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -32,8 +37,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    loadProducts(page);
-  }, [page, loadProducts]);
+    loadProducts(cursor);
+  }, [cursor, loadProducts]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -166,16 +171,25 @@ export default function Home() {
 
             <div className="flex justify-center gap-3 mt-8">
               <button
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
+                disabled={pageIndex === 0}
+                onClick={() => {
+                  const prev = cursorHistory[pageIndex - 1];
+                  setPageIndex((i) => i - 1);
+                  setCursor(prev ?? null);
+                }}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-100"
               >
                 ← Previous
               </button>
-              <span className="px-4 py-2 text-sm text-gray-500">Page {page}</span>
+              <span className="px-4 py-2 text-sm text-gray-500">Page {pageIndex + 1}</span>
               <button
-                disabled={products.length < 50}
-                onClick={() => setPage((p) => p + 1)}
+                disabled={!nextCursor}
+                onClick={() => {
+                  if (!nextCursor) return;
+                  setCursorHistory((h) => [...h, nextCursor]);
+                  setPageIndex((i) => i + 1);
+                  setCursor(nextCursor);
+                }}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-100"
               >
                 Next →

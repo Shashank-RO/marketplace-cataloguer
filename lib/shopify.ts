@@ -45,15 +45,24 @@ export function shopifyFetch(path: string, token?: string) {
   });
 }
 
-export async function fetchProducts(page = 1, limit = 50, token?: string): Promise<ShopifyProduct[]> {
-  const res = await shopifyFetch(`products.json?limit=${limit}&page=${page}`, token);
+export async function fetchProducts(cursor?: string, limit = 50, token?: string): Promise<{ products: ShopifyProduct[], nextCursor: string | null }> {
+  const url = cursor
+    ? `products.json?limit=${limit}&page_info=${cursor}`
+    : `products.json?limit=${limit}`;
+  const res = await shopifyFetch(url, token);
   if (!res.ok) {
     const body = await res.text();
     console.error(`[shopify] products error ${res.status}:`, body.substring(0, 200));
     throw new Error(`Shopify error ${res.status}: ${body.substring(0, 100)}`);
   }
   const data = await res.json();
-  return data.products;
+
+  // Extract next page cursor from Link header
+  const linkHeader = res.headers.get("link") || "";
+  const nextMatch = linkHeader.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
+  const nextCursor = nextMatch ? nextMatch[1] : null;
+
+  return { products: data.products, nextCursor };
 }
 
 export async function fetchProduct(id: string, token?: string): Promise<ShopifyProduct> {
