@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchProducts } from "@/lib/shopify";
-import { getToken, refreshToken } from "@/lib/token-store";
 
 export async function GET(req: NextRequest) {
+  const token = req.cookies.get("shopify_token")?.value;
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized", redirect: "/api/auth" }, { status: 401 });
+  }
+
   try {
     const page = Number(req.nextUrl.searchParams.get("page") || "1");
-    let token = await getToken();
-    try {
-      const products = await fetchProducts(page, 50, token);
-      return NextResponse.json({ products });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg.includes("401") || msg.includes("400")) {
-        // Token rejected — force refresh and retry once
-        token = await refreshToken();
-        const products = await fetchProducts(page, 50, token);
-        return NextResponse.json({ products });
-      }
-      throw e;
-    }
+    const products = await fetchProducts(page, 50, token);
+    return NextResponse.json({ products });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
+    if (message.includes("401") || message.includes("403")) {
+      return NextResponse.json({ error: "Unauthorized", redirect: "/api/auth" }, { status: 401 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
