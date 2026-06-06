@@ -36,7 +36,7 @@ const domain = process.env.SHOPIFY_STORE_DOMAIN;
 export function shopifyFetch(path: string, token?: string) {
   const t = token || process.env.SHOPIFY_ADMIN_TOKEN;
   if (!domain || !t) throw new Error("Shopify env vars not set");
-  return fetch(`https://${domain}/admin/api/2024-01/${path}`, {
+  return fetch(`https://${domain}/admin/api/2025-01/${path}`, {
     headers: {
       "X-Shopify-Access-Token": t,
       "Content-Type": "application/json",
