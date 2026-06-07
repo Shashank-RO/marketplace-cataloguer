@@ -48,7 +48,7 @@ export function shopifyFetch(path: string, token?: string) {
 export async function fetchProducts(cursor?: string, limit = 50, token?: string): Promise<{ products: ShopifyProduct[], nextCursor: string | null }> {
   const url = cursor
     ? `products.json?limit=${limit}&page_info=${cursor}`
-    : `products.json?limit=${limit}`;
+    : `products.json?limit=${limit}&order=created_at+desc`;
   const res = await shopifyFetch(url, token);
   if (!res.ok) {
     const body = await res.text();
