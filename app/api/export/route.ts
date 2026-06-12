@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchProduct } from "@/lib/shopify";
 import { buildMyntraWorkbook } from "@/lib/myntra-template";
+import { fillMyntraTemplate } from "@/lib/myntra-export";
 import { getToken, refreshToken } from "@/lib/token-store";
 
 export async function POST(req: NextRequest) {
   try {
-    const { productIds, marketplace } = await req.json();
+    const body = await req.json();
+    const { productIds, marketplace, templateDataUrl } = body as {
+      productIds: string[];
+      marketplace: string;
+      templateDataUrl?: string; // base64 data URL of the combined Myntra template
+    };
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json({ error: "No products selected" }, { status: 400 });
@@ -28,8 +34,21 @@ export async function POST(req: NextRequest) {
     }
 
     if (marketplace === "myntra") {
-      const buffer = await buildMyntraWorkbook(products);
-      const filename = `myntra-catalog-${Date.now()}.xlsx`;
+      let buffer: ExcelJS.Buffer;
+      let filename: string;
+
+      if (templateDataUrl) {
+        // Template-based export: fill the uploaded combined Myntra format
+        const base64 = templateDataUrl.replace(/^data:[^;]+;base64,/, "");
+        const templateBuffer = Buffer.from(base64, "base64");
+        buffer = await fillMyntraTemplate(templateBuffer, products);
+        filename = `myntra-filled-${Date.now()}.xlsx`;
+      } else {
+        // Fallback: build a simple workbook (no template uploaded)
+        buffer = await buildMyntraWorkbook(products);
+        filename = `myntra-catalog-${Date.now()}.xlsx`;
+      }
+
       return new NextResponse(buffer as ArrayBuffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -44,3 +63,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// ExcelJS Buffer type needed at module level
+import type ExcelJS from "exceljs";
