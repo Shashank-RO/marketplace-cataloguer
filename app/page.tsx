@@ -414,7 +414,11 @@ export default function Home() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `myntra-${Date.now()}.xlsx`; a.click();
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yy = String(now.getFullYear()).slice(-2);
+      a.href = url; a.download = `${dd}${mm}${yy} Myntra-${Date.now()}.xlsx`; a.click();
       URL.revokeObjectURL(url);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Export failed");

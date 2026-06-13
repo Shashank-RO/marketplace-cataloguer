@@ -35,6 +35,12 @@ export async function POST(req: NextRequest) {
 
     if (marketplace === "myntra") {
       let buffer: ExcelJS.Buffer;
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yy = String(now.getFullYear()).slice(-2);
+      const datePfx = `${dd}${mm}${yy}`;
+
       let filename: string;
 
       if (templateDataUrl) {
@@ -42,17 +48,17 @@ export async function POST(req: NextRequest) {
         const base64 = templateDataUrl.replace(/^data:[^;]+;base64,/, "");
         const templateBuffer = Buffer.from(base64, "base64");
         buffer = await fillMyntraTemplate(templateBuffer, products);
-        filename = `myntra-filled-${Date.now()}.xlsx`;
+        filename = `${datePfx} Myntra-${Date.now()}.xlsx`;
       } else {
         // Fallback: build a simple workbook (no template uploaded)
         buffer = await buildMyntraWorkbook(products);
-        filename = `myntra-catalog-${Date.now()}.xlsx`;
+        filename = `${datePfx} Myntra-${Date.now()}.xlsx`;
       }
 
       return new NextResponse(buffer as ArrayBuffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
         },
       });
     }
