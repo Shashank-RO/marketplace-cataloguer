@@ -928,7 +928,10 @@ function getValue(
   const hl = h.toLowerCase();
   const size = (variant.option1 || "S").toUpperCase();
   const measurements = SIZE_CHART[size] || SIZE_CHART["S"];
-  const colour = extractColourFromTitle(product.title) || variant.option1 || "";
+  // option1 is always size; option2 is colour when the product has a colour option
+  const SIZE_PATTERN = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|\d+)$/i;
+  const colourFromOption = SIZE_PATTERN.test((variant.option1 || "").trim()) ? (variant.option2 || "") : (variant.option1 || "");
+  const colour = extractColourFromTitle(product.title) || colourFromOption;
   const articleNumber = extractArticleNumber(variant.sku || "");
   const lengthText = extractLength(tagMap, description);
   const frontLength = LENGTH_INCHES[lengthText] || measurements.bust; // fallback
