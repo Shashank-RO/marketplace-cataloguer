@@ -841,6 +841,7 @@ function getValue(
   baseMrp: number,
   baseIsp: number,
   colorVariantGroupId: string,
+  meta: { year?: string; season?: string } = {},
 ): string | number | { text: string; hyperlink: string } | null {
   // Helper: return vision value if present, else fall back to text-extraction
   function withVision(visionVal: string | undefined, fallback: () => string): string {
@@ -907,8 +908,8 @@ function getValue(
     if (at.includes("kurta set") || at.includes("co-ord") || at.includes("dress")) return "";
     return "Casual";
   }
-  if (hl === "year") return String(new Date().getFullYear());
-  if (hl === "season") return extractSeason(tagMap);
+  if (hl === "year") return meta.year || String(new Date().getFullYear());
+  if (hl === "season") return meta.season || extractSeason(tagMap);
   if (hl === "addeddate") return "";
 
   // ── Descriptions ──
@@ -1176,6 +1177,7 @@ export async function fillMyntraTemplate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templateBuffer: any,
   products: ShopifyProduct[],
+  meta: { year?: string; season?: string } = {},
 ): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(templateBuffer);
@@ -1287,7 +1289,7 @@ export async function fillMyntraTemplate(
         const row = ws.getRow(nextRow++);
         headers.forEach((h, i) => {
           if (!h) return;
-          const val = getValue(h, product, variant, tagMap, imageUrls, styleGroupId, sheetName, description, vision, baseMrp, baseIsp, colorGroupMap.get(product.id) || extractArticleNumber(product.variants[0]?.sku || ""));
+          const val = getValue(h, product, variant, tagMap, imageUrls, styleGroupId, sheetName, description, vision, baseMrp, baseIsp, colorGroupMap.get(product.id) || extractArticleNumber(product.variants[0]?.sku || ""), meta);
           const cell = row.getCell(i + 1);
           if (val !== null && val !== "") {
             if (typeof val === "object" && "hyperlink" in val) {

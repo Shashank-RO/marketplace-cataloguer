@@ -7,10 +7,12 @@ import { getToken, refreshToken } from "@/lib/token-store";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { productIds, marketplace, templateDataUrl } = body as {
+    const { productIds, marketplace, templateDataUrl, year, season } = body as {
       productIds: string[];
       marketplace: string;
-      templateDataUrl?: string; // base64 data URL of the combined Myntra template
+      templateDataUrl?: string;
+      year?: string;
+      season?: string;
     };
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
         // Template-based export: fill the uploaded combined Myntra format
         const base64 = templateDataUrl.replace(/^data:[^;]+;base64,/, "");
         const templateBuffer = Buffer.from(base64, "base64");
-        buffer = await fillMyntraTemplate(templateBuffer, products);
+        buffer = await fillMyntraTemplate(templateBuffer, products, { year, season });
         filename = `${datePfx} Myntra-${Date.now()}.xlsx`;
       } else {
         // Fallback: build a simple workbook (no template uploaded)

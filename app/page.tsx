@@ -231,6 +231,19 @@ export default function Home() {
   const [pageIndex, setPageIndex] = useState(0);
   const [showFormats, setShowFormats] = useState(false);
   const [exportError, setExportError] = useState<{ missingTypes: { shopify: string; myntra: string }[] } | null>(null);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+
+  function getCurrentSeason(): string {
+    const m = new Date().getMonth() + 1;
+    if (m <= 2 || m === 12) return "Winter";
+    if (m <= 5) return "Spring";
+    if (m <= 8) return "Summer";
+    return "Fall";
+  }
+  const YEARS = Array.from({ length: 16 }, (_, i) => String(2011 + i));
+  const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
+  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()));
+  const [exportSeason, setExportSeason] = useState(getCurrentSeason());
 
   // ── Staged (pending) filter state ──
   const [stagedType, setStagedType] = useState("");
@@ -371,11 +384,10 @@ export default function Home() {
     }
   };
 
-  const exportCatalog = async () => {
+  const exportCatalog = () => {
     if (selected.size === 0) return;
 
     // ── Pre-export validation against combined template ──
-    let templateDataUrl: string | undefined;
     try {
       const storedCombined = localStorage.getItem("myntra_combined_format");
       if (!storedCombined) {
@@ -383,7 +395,6 @@ export default function Home() {
         return;
       }
       const combined = JSON.parse(storedCombined) as { sheets: string[]; dataUrl: string };
-      // Find unique product types of selected products
       const selectedProducts = products.filter((p) => selected.has(p.id));
       const uniqueTypes = Array.from(new Set(selectedProducts.map((p) => p.product_type).filter(Boolean)));
       const MYNTRA_LABELS: Record<string, string> = {
@@ -398,11 +409,23 @@ export default function Home() {
         setExportError({ missingTypes });
         return;
       }
-      templateDataUrl = combined.dataUrl;
     } catch {
       alert("Could not read the saved Myntra template. Please re-upload it via Marketplace Base Formats.");
       return;
     }
+
+    // Show year/season confirmation popup
+    setShowExportConfirm(true);
+  };
+
+  const doExport = async (year: string, season: string) => {
+    setShowExportConfirm(false);
+
+    let templateDataUrl: string | undefined;
+    try {
+      const storedCombined = localStorage.getItem("myntra_combined_format");
+      if (storedCombined) templateDataUrl = JSON.parse(storedCombined).dataUrl;
+    } catch {}
 
     setExporting(true);
     try {
@@ -412,6 +435,8 @@ export default function Home() {
         body: JSON.stringify({
           productIds: Array.from(selected),
           marketplace: "myntra",
+          year,
+          season,
           ...(templateDataUrl ? { templateDataUrl } : {}),
         }),
       });
@@ -435,6 +460,52 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       {showFormats && <MyntraFormatsModal onClose={() => setShowFormats(false)} />}
+
+      {/* ── Export confirmation modal ── */}
+      {showExportConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-1">Confirm Export Details</h3>
+            <p className="text-xs text-gray-500 mb-5">These values will be filled in Year and Season columns for all exported products.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Year</label>
+                <select
+                  value={exportYear}
+                  onChange={(e) => setExportYear(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                >
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Season</label>
+                <select
+                  value={exportSeason}
+                  onChange={(e) => setExportSeason(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#FF3F6C]"
+                >
+                  {SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowExportConfirm(false)}
+                className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => doExport(exportYear, exportSeason)}
+                className="flex-1 py-2.5 rounded-lg bg-[#FF3F6C] text-white text-sm font-semibold hover:bg-[#e6345a]"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Export error — missing template sheets */}
       {exportError && (
