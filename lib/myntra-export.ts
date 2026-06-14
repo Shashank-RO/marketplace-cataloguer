@@ -1250,6 +1250,23 @@ export async function fillMyntraTemplate(
       colorGroupMap.set(p.id, baseNameToGroupId.get(baseName)!);
     }
 
+    // Pre-fetch all vision calls in parallel (with 8s timeout per product)
+    const visionMap = new Map<string, VisionAttributes | null>();
+    await Promise.all(sheetProducts.map(async (product) => {
+      const primaryImageUrl = product.images[0]?.src
+        .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (_, ext) => ext || "") || "";
+      if (!primaryImageUrl) { visionMap.set(product.id, null); return; }
+      try {
+        const result = await Promise.race([
+          analyzeProductImage(primaryImageUrl),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+        ]);
+        visionMap.set(product.id, result);
+      } catch {
+        visionMap.set(product.id, null);
+      }
+    }));
+
     let styleGroupId = 1;
     for (const product of sheetProducts) {
       const tagMap = parseTagMap(product.tags);
@@ -1259,9 +1276,7 @@ export async function fillMyntraTemplate(
         img.src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || ""),
       );
 
-      // Analyse first image with vision API (once per product, cached)
-      const primaryImageUrl = imageUrls[0] || "";
-      const vision = primaryImageUrl ? await analyzeProductImage(primaryImageUrl) : null;
+      const vision = visionMap.get(product.id) ?? null;
 
       // Myntra requires the same MRP and ISP across all sizes of a style.
       // Use the minimum MRP/ISP across all variants (XS–XXL price, not 3XL+ premium).
