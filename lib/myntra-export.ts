@@ -56,6 +56,8 @@ const SHEET_OVERRIDES: Record<string, string[]> = {
   "coord sets":   ["Co-Ords", "Co-ord Sets", "Coord Sets"],
   "kurta set":    ["Kurta Sets", "Kurta Set"],
   "kurta sets":   ["Kurta Sets", "Kurta Set"],
+  "tops":         ["Tunics", "Tops / Tunics", "Tops"],
+  "top":          ["Tunics", "Tops / Tunics", "Tops"],
 };
 
 function norm(s: string): string {
@@ -1212,12 +1214,12 @@ export async function fillMyntraTemplate(
   });
 
   // Group products by target sheet
+  const sheetNames = wb.worksheets.map((ws) => ws.name);
   const bySheet = new Map<string, { ws: ExcelJS.Worksheet; products: ShopifyProduct[]; sheetName: string }>();
   for (const product of products) {
-    const normType = norm(product.product_type || "");
-    let matchedKey = [...sheetMap.keys()].find((k) => k === normType);
-    if (!matchedKey) matchedKey = [...sheetMap.keys()].find((k) => k.includes(normType) || normType.includes(k));
-    if (!matchedKey) continue;
+    const matchedSheetName = findMatchingSheet(product.product_type || "", sheetNames);
+    if (!matchedSheetName) continue;
+    const matchedKey = norm(matchedSheetName);
     if (!bySheet.has(matchedKey)) {
       bySheet.set(matchedKey, { ws: sheetMap.get(matchedKey)!, products: [], sheetName: "" });
     }
