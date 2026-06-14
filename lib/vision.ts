@@ -6,12 +6,14 @@ export interface VisionAttributes {
   sleeveStyling: string;
   shape: string;
   length: string;
+  topLength: string;
   pattern: string;
   hemline: string;
   occasion: string;
   topType: string;
   bottomType: string;
   designStyling: string;
+  patternCoverage: string;
 }
 
 let _client: Anthropic | null = null;
@@ -30,13 +32,15 @@ neck: One of — "Round Neck", "V Neck", "High Neck", "Square Neck", "Boat Neck"
 sleeveLength: One of — "Sleeveless", "Short Sleeves", "3/4th Sleeve", "Long Sleeves", "Cap Sleeves", "" (if unclear)
 sleeveStyling: One of — "Bell Sleeves", "Flared Sleeves", "Puff Sleeves", "Regular Sleeves", "Cold-Shoulder", "" (if unclear)
 shape: One of — "A-Line", "Fit and Flare", "Straight", "Flared", "Bodycon", "Shift", "" (if unclear)
-length: One of — "Above Knee", "Knee Length", "Calf Length", "Ankle Length", "Floor Length", "" (if unclear). Rule: if hem is above knee = "Above Knee", at or just below knee = "Knee Length", mid-calf = "Calf Length", ankle = "Ankle Length", touching floor = "Floor Length"
+length: For sets (kurta + bottom), this is the BOTTOM garment hem length. For single garments, the garment hem length. One of — "Above Knee", "Knee Length", "Calf Length", "Ankle Length", "Floor Length", "" (if unclear)
+topLength: For sets (kurta + bottom), this is ONLY the KURTA TOP hem length — where the kurta top ends, ignoring the trouser/palazzo below. One of — "Above Knee", "Knee Length", "Calf Length", "Floor Length", "" (if not a set or unclear). Typical kurta tops in sets end "Above Knee" or "Knee Length"
 pattern: One of — "Floral", "Abstract", "Geometric", "Stripes", "Checked", "Animal Print", "Paisley", "Printed", "Embroidered", "Solid", "" (if unclear)
 hemline: One of — "Straight", "Asymmetric", "Curved", "High-Low", "Flared", "" (if unclear)
 occasion: One of — "Casual", "Daily", "Fusion", "Party", "Formal", "Wedding", "" (if unclear)
 topType: One of — "Kurta", "Top", "Tunic", "Blouse", "" (if not a set)
 bottomType: One of — "Trousers", "Palazzo", "Skirt", "Salwar", "Pant", "" (if not a set)
 designStyling: One of — "Regular", "Printed", "Embroidered", "Yoke Design", "Placement Print", "Solid", "" (if unclear)
+patternCoverage: Where is the embroidery/print concentrated? One of — "Yoke or Border" (embroidery/print only at neckline yoke or hem border), "Placement" (small placement print/embroidery at one spot), "Small" (scattered small motifs across less than 30% of garment), "Large" (heavy print/embroidery covering most of garment), "None" (solid/plain garment), "" (if unclear)
 
 Return ONLY the JSON, no explanation.`;
 
@@ -50,7 +54,6 @@ export async function analyzeProductImage(imageUrl: string): Promise<VisionAttri
 
   try {
     console.log("[vision] analysing:", imageUrl.substring(0, 80));
-    // Fetch the image and convert to base64 (Myntra template uses full-res URLs)
     const imgRes = await fetch(imageUrl);
     if (!imgRes.ok) { console.error("[vision] image fetch failed:", imgRes.status); return null; }
 

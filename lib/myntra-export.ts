@@ -732,10 +732,14 @@ function generateMarketplaceTags(
   return Array.from(tags).filter(Boolean).join(", ");
 }
 
-/** Extract neck type from tags/description, snapped to Myntra values */
-function extractNeck(tagMap: Record<string, string>, description: string): string {
-  const allText = tagMap["neck"] || tagMap["neckline"] || description || "";
-  return snapToMap(allText, NECK_MAP);
+/** Extract neck type from tags/description/title, snapped to Myntra values */
+function extractNeck(tagMap: Record<string, string>, description: string, title = ""): string {
+  // Priority: explicit tag > description > title
+  const explicit = tagMap["neck"] || tagMap["neckline"] || tagMap["neck_type"] || "";
+  if (explicit) return snapToMap(explicit, NECK_MAP);
+  const fromDesc = snapToMap(description, NECK_MAP);
+  if (fromDesc) return fromDesc;
+  return snapToMap(title, NECK_MAP);
 }
 
 /** Extract sleeve length from tags/description, snapped to Myntra values */
@@ -843,9 +847,13 @@ function getValue(
   colorVariantGroupId: string,
   meta: { year?: string; season?: string } = {},
 ): string | number | { text: string; hyperlink: string } | null {
-  // Helper: return vision value if present, else fall back to text-extraction
+  // Helper: vision takes priority (for fields where AI is more reliable than tags)
   function withVision(visionVal: string | undefined, fallback: () => string): string {
     return visionVal || fallback();
+  }
+  // Helper: text extraction takes priority; AI vision only if text yields nothing
+  function withTextFirst(textFn: () => string, visionVal: string | undefined): string {
+    return textFn() || visionVal || "";
   }
   const h = colHeader.trim();
   const hl = h.toLowerCase();
@@ -943,7 +951,7 @@ function getValue(
   if (hl === "knit or woven") return tagMap["knit_or_woven"] || tagMap["fabric_type"] || "";
   if (hl === "sleeve length") return withVision(vision?.sleeveLength, () => extractSleeveLength(tagMap, description));
   if (hl === "sleeve styling") return withVision(vision?.sleeveStyling, () => extractSleeveStyling(tagMap, description));
-  if (hl === "neck") return withVision(vision?.neck, () => extractNeck(tagMap, description));
+  if (hl === "neck") return withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
   if (hl === "shape") return withVision(vision?.shape, () => extractShape(tagMap, description));
   if (hl === "length") {
     const isDress = articleType.toLowerCase().includes("dress");
@@ -951,7 +959,9 @@ function getValue(
       const allText = tagMap["length"] || tagMap["garment_length"] || "";
       return withVision(vision?.length, () => snapToMap(allText || lengthText, DRESS_LENGTH_MAP));
     }
-    return withVision(vision?.length, () => lengthText);
+    // Kurtas/Tunics: vision is most accurate; text fallback only if explicit length tag exists
+    const explicitLength = tagMap["length"] || tagMap["garment_length"] || "";
+    return vision?.length || (explicitLength ? snapToMap(explicitLength, LENGTH_MAP) : "");
   }
   if (hl === "hemline") return withVision(vision?.hemline, () => snapToMap(tagMap["hemline"] || "", HEMLINE_MAP));
   if (hl === "slit detail") return tagMap["slit_detail"] || tagMap["slit"] || "";
@@ -1003,10 +1013,22 @@ function getValue(
   if (hl === "top hemline") return tagMap["top_hemline"] || "Flared";
   if (hl === "bottom hemline") return tagMap["bottom_hemline"] || "";
   if (hl === "top design styling") return withVision(vision?.designStyling, () => "Regular");
-  if (hl === "top length") return withVision(vision?.length, () => lengthText);
+  // Top length (Kurta Sets): physical length of the kurta top only (not the bottom/palazzo)
+  if (hl === "top length") {
+    const TOP_LENGTH_MAP: Record<string, string> = {
+      "above knee": "Above Knee",
+      "knee length": "Knee Length", "knee": "Knee Length",
+      "calf length": "Calf Length", "calf": "Calf Length", "midi": "Calf Length",
+      "ankle length": "Floor Length", "floor length": "Floor Length", "maxi": "Floor Length",
+    };
+    return snapToMap(vision?.topLength || vision?.length || "", TOP_LENGTH_MAP) || "";
+  }
   if (hl === "top shape") return withVision(vision?.shape, () => extractShape(tagMap, description));
   if (hl === "waistband") return "Elasticated";
-  if (hl === "pattern coverage") return snapToMap(tagMap["pattern_coverage"] || description, { "yoke": "Yoke or Border", "placement": "Placement", "small": "Small", "large": "Large" }) || "None";
+  if (hl === "pattern coverage") {
+    const fromTag = snapToMap(tagMap["pattern_coverage"] || "", { "yoke": "Yoke or Border", "border": "Yoke or Border", "placement": "Placement", "small": "Small", "large": "Large", "none": "None" });
+    return fromTag || vision?.patternCoverage || "None";
+  }
   if (hl === "collection name") return tagMap["collection"] || "";
 
   // ── Dupatta ──
@@ -1106,67 +1128,66 @@ function buildListViewName(
   // Strip colour suffix " - Ink Blue" etc.
   const base = title.replace(/\s*-\s*[^-]+$/, "").trim();
 
-  // Detect category tail
+  // Detect category tail (e.g. "Kurta", "Kurta Set")
   let categoryTail = "";
   for (const { pattern, tail } of CATEGORY_TAILS) {
     if (pattern.test(base)) { categoryTail = tail; break; }
   }
+  const categoryWords = categoryTail ? categoryTail.split(" ") : [];
 
-  // Strip category tail from the base to get the descriptor portion
+  // Strip category tail to get descriptor portion
   const baseWithoutCategory = categoryTail
     ? base.replace(new RegExp(`\\s*${categoryTail}\\s*$`, "i"), "").trim()
     : base;
 
-  // Detect and inject fabric
+  const descWords = baseWithoutCategory.split(" ");
+  const descLower = baseWithoutCategory.toLowerCase();
+
+  // Detect fabric
   const fabric = extractFabric(tagMap, description);
   const fabricWords = fabric ? fabric.split(" ") : [];
-
-  // Build ordered word list: design-name-word, meaningful descriptors, fabric words, category
-  const descWords = baseWithoutCategory.split(" ");
-
-  // Check if fabric is already present in the descriptor words
-  const descLower = baseWithoutCategory.toLowerCase();
   const fabricAlreadyPresent = fabricWords.some((w) => w.length > 3 && descLower.includes(w.toLowerCase()));
 
-  // Assemble candidate: all descriptor words + (fabric if missing) + category
-  const candidateWords: string[] = [...descWords];
-  if (fabric && !fabricAlreadyPresent) {
-    candidateWords.push(...fabricWords);
-  }
-  if (categoryTail) candidateWords.push(...categoryTail.split(" "));
+  // Helper: join words and check length, always protecting category tail at end
+  const tryWords = (words: string[]): string => {
+    const tail = categoryTail ? [...categoryWords] : [];
+    // Remove any filler words from middle
+    const mid = words.filter(w => !categoryWords.map(c=>c.toLowerCase()).includes(w.toLowerCase()));
+    return [...mid, ...tail].join(" ");
+  };
 
-  // Join and check length
-  let candidate = candidateWords.join(" ");
+  // Pass 1: all descriptor words + (fabric if missing) + category
+  const pass1Words = [...descWords, ...(fabricAlreadyPresent ? [] : fabricWords)];
+  let candidate = tryWords(pass1Words);
   if (candidate.length <= maxLen) return candidate;
 
-  // Too long — progressively drop filler words from the middle (keep first + last cluster)
-  const essential = categoryTail ? categoryTail.split(" ") : [];
-  const kept: string[] = [];
-  // First pass: keep non-filler descriptor words + fabric words + category
-  for (const w of descWords) {
-    if (!FILLER_WORDS.has(w.toLowerCase())) kept.push(w);
-  }
-  if (fabric && !fabricAlreadyPresent) kept.push(...fabricWords);
-  if (categoryTail) kept.push(...essential);
-  candidate = kept.join(" ");
+  // Pass 2: drop filler words from descriptors
+  const pass2Words = descWords.filter(w => !FILLER_WORDS.has(w.toLowerCase()));
+  if (!fabricAlreadyPresent) pass2Words.push(...fabricWords);
+  candidate = tryWords(pass2Words);
   if (candidate.length <= maxLen) return candidate;
 
-  // Still too long — keep only first descriptor word + fabric + category
-  const firstWord = descWords[0] || "";
-  const parts: string[] = [];
-  if (firstWord) parts.push(firstWord);
-  if (fabric && !fabricAlreadyPresent) parts.push(...fabricWords);
-  else if (fabric) {
-    // fabric already in descriptor — pick the single most meaningful fabric word
-    const bestFabricWord = fabricWords.find((w) => w.length > 3) || "";
-    if (bestFabricWord && !descLower.includes(bestFabricWord.toLowerCase())) parts.push(bestFabricWord);
-  }
-  if (categoryTail) parts.push(...essential);
-  candidate = parts.join(" ");
+  // Pass 3: drop fabric words too (keep design name + key descriptor + category)
+  const pass3Words = descWords.filter(w =>
+    !FILLER_WORDS.has(w.toLowerCase()) &&
+    !fabricWords.map(f => f.toLowerCase()).includes(w.toLowerCase())
+  );
+  candidate = tryWords(pass3Words);
   if (candidate.length <= maxLen) return candidate;
 
-  // Last resort — word-trim
-  return wordTrim(candidate, maxLen);
+  // Pass 4: trim middle words while always keeping first word + category
+  // Remove middle words one at a time (from right of middle) until it fits
+  const trimWords = [...pass3Words];
+  while (trimWords.length > 1 && tryWords(trimWords).length > maxLen) {
+    trimWords.splice(trimWords.length - 1, 1); // drop last middle word
+  }
+  candidate = tryWords(trimWords);
+  if (candidate.length <= maxLen) return candidate;
+
+  // Last resort — hard word-trim but protect category
+  const withoutCat = candidate.replace(new RegExp(`\\s*${categoryTail}\\s*$`, "i"), "").trim();
+  const trimmed = wordTrim(withoutCat, maxLen - categoryTail.length - 1);
+  return categoryTail ? `${trimmed} ${categoryTail}` : trimmed;
 }
 
 // ─── Main export function ─────────────────────────────────────────────────────
@@ -1219,7 +1240,15 @@ export async function fillMyntraTemplate(
     wb.removeWorksheet(ws.id);
   }
 
-  for (const { ws, products: sheetProducts, sheetName } of bySheet.values()) {
+  for (const { ws, products: unsortedProducts, sheetName } of bySheet.values()) {
+    // Sort products by VAN number ascending (BM2065 → BM2066 → BM2067)
+    const sheetProducts = [...unsortedProducts].sort((a, b) => {
+      const vanA = extractArticleNumber(a.variants[0]?.sku || "");
+      const vanB = extractArticleNumber(b.variants[0]?.sku || "");
+      const numA = parseInt(vanA.replace(/\D/g, ""), 10) || 0;
+      const numB = parseInt(vanB.replace(/\D/g, ""), 10) || 0;
+      return numA - numB;
+    });
     // Read column headers from row 3
     const headers: string[] = [];
     ws.getRow(3).eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -1261,7 +1290,7 @@ export async function fillMyntraTemplate(
       try {
         const result = await Promise.race([
           analyzeProductImage(primaryImageUrl),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
         ]);
         visionMap.set(product.id, result);
       } catch {
