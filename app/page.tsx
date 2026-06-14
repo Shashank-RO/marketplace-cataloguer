@@ -378,26 +378,31 @@ export default function Home() {
     let templateDataUrl: string | undefined;
     try {
       const storedCombined = localStorage.getItem("myntra_combined_format");
-      if (storedCombined) {
-        const combined = JSON.parse(storedCombined) as { sheets: string[]; dataUrl: string };
-        // Find unique product types of selected products
-        const selectedProducts = products.filter((p) => selected.has(p.id));
-        const uniqueTypes = Array.from(new Set(selectedProducts.map((p) => p.product_type).filter(Boolean)));
-        const MYNTRA_LABELS: Record<string, string> = {
-          "dresses": "Ethnic Dresses", "dress": "Ethnic Dresses",
-          "co-ord set": "Co-Ords", "co-ord sets": "Co-Ords", "coord set": "Co-Ords",
-          "kurta set": "Kurta Sets", "kurta sets": "Kurta Sets",
-        };
-        const missingTypes = uniqueTypes
-          .filter((t) => !findMatchingSheet(t, combined.sheets))
-          .map((t) => ({ shopify: t, myntra: MYNTRA_LABELS[t.toLowerCase()] || t }));
-        if (missingTypes.length > 0) {
-          setExportError({ missingTypes });
-          return;
-        }
-        templateDataUrl = combined.dataUrl;
+      if (!storedCombined) {
+        alert("No Myntra template uploaded. Please upload a base template via Marketplace Base Formats before exporting.");
+        return;
       }
-    } catch {}
+      const combined = JSON.parse(storedCombined) as { sheets: string[]; dataUrl: string };
+      // Find unique product types of selected products
+      const selectedProducts = products.filter((p) => selected.has(p.id));
+      const uniqueTypes = Array.from(new Set(selectedProducts.map((p) => p.product_type).filter(Boolean)));
+      const MYNTRA_LABELS: Record<string, string> = {
+        "dresses": "Ethnic Dresses", "dress": "Ethnic Dresses",
+        "co-ord set": "Co-Ords", "co-ord sets": "Co-Ords", "coord set": "Co-Ords",
+        "kurta set": "Kurta Sets", "kurta sets": "Kurta Sets",
+      };
+      const missingTypes = uniqueTypes
+        .filter((t) => !findMatchingSheet(t, combined.sheets))
+        .map((t) => ({ shopify: t, myntra: MYNTRA_LABELS[t.toLowerCase()] || t }));
+      if (missingTypes.length > 0) {
+        setExportError({ missingTypes });
+        return;
+      }
+      templateDataUrl = combined.dataUrl;
+    } catch {
+      alert("Could not read the saved Myntra template. Please re-upload it via Marketplace Base Formats.");
+      return;
+    }
 
     setExporting(true);
     try {
