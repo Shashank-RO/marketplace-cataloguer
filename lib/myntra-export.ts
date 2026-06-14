@@ -291,15 +291,15 @@ const CLOSURE_MAP: Record<string, string> = {
 // Keys are lowercase substrings; first match wins (order matters).
 
 const FABRIC_MAP: [string, string][] = [
-  ["slub cotton", "Pure Cotton"],
-  ["mul cotton", "Pure Cotton"],
-  ["mulmul", "Pure Cotton"],
+  ["slub cotton", "Cotton"],
+  ["mul cotton", "Cotton"],
+  ["mulmul", "Cotton"],
   ["organic cotton", "Organic Cotton"],
-  ["pure cotton", "Pure Cotton"],
+  ["pure cotton", "Cotton"],
   ["cotton silk", "Cotton Silk"],
-  ["cotton blend", "Pure Cotton"],
-  ["cotton wool", "Pure Cotton"],
-  ["cotton", "Pure Cotton"],
+  ["cotton blend", "Cotton"],
+  ["cotton wool", "Cotton"],
+  ["cotton", "Cotton"],
   ["modal", "Modal"],              // Kurtas sheet allows "Modal"
   ["liva", "Liva"],
   ["livaeco", "Liva"],
@@ -482,6 +482,7 @@ function normaliseFabric(raw: string, forSets = false, forDress = false): string
 }
 
 // Myntra exact values for other dropdowns
+// Sheet-agnostic NECK_MAP — values must be post-snapped per sheet if needed
 const NECK_MAP: Record<string, string> = {
   "round neck": "Round Neck", "round": "Round Neck",
   "v neck": "V-Neck", "v-neck": "V-Neck", "v shaped": "V-Neck",
@@ -501,10 +502,25 @@ const NECK_MAP: Record<string, string> = {
   "u-neck": "Scoop Neck", "u neck": "Scoop Neck",
 };
 
+// Per-sheet neck normalisation: snap "V Neck" → "V-Neck" etc.
+function snapNeck(val: string, articleType: string): string {
+  const at = articleType.toLowerCase();
+  // Dresses don't have Scoop Neck / High Neck / Band Collar — fall back to closest
+  if (at.includes("dress")) {
+    if (val === "High Neck") return "Mock Neck";
+    if (val === "Scoop Neck") return "Round Neck";
+  }
+  // Tunics don't have Off-Shoulder or Band Collar
+  if (at.includes("tunic")) {
+    if (val === "Off-Shoulder") return "Halter Neck";
+  }
+  return val;
+}
+
 const SLEEVE_LENGTH_MAP: Record<string, string> = {
   "sleeveless": "Sleeveless", "no sleeve": "Sleeveless",
-  "short sleeve": "Short Sleeves", "short-sleeve": "Short Sleeves",
-  "3/4": "Three-Quarter Sleeves", "three-quarter": "Three-Quarter Sleeves", "three quarter": "Three-Quarter Sleeves",
+  "short sleeve": "Short Sleeves", "short-sleeve": "Short Sleeves", "cap sleeve": "Short Sleeves",
+  "3/4th": "Three-Quarter Sleeves", "3/4": "Three-Quarter Sleeves", "three-quarter": "Three-Quarter Sleeves", "three quarter": "Three-Quarter Sleeves",
   "long sleeve": "Long Sleeves", "full sleeve": "Long Sleeves", "full-sleeve": "Long Sleeves",
 };
 
@@ -535,6 +551,24 @@ const SHAPE_MAP: Record<string, string> = {
   "flared": "Anarkali",
   "bodycon": "Straight",
   "shift": "Straight",
+};
+
+// Dress-specific shape map — valid: Wrap/Shirt/Fit and Flare/A-Line/Kaftan/Maxi/Pinafore/Drop-Waist/Empire/Balloon/Gown
+const DRESS_SHAPE_MAP: Record<string, string> = {
+  "wrap": "Wrap", "shirt": "Shirt",
+  "fit and flare": "Fit and Flare", "fit-and-flare": "Fit and Flare",
+  "a-line": "A-Line", "a line": "A-Line", "flared": "A-Line",
+  "kaftan": "Kaftan",
+  "maxi": "Maxi",
+  "pinafore": "Pinafore",
+  "drop waist": "Drop-Waist", "drop-waist": "Drop-Waist",
+  "empire": "Empire",
+  "balloon": "Balloon",
+  "gown": "Gown",
+  "straight": "A-Line",   // no Straight in dress sheet → A-Line closest
+  "shift": "Shirt",       // Shift → Shirt closest
+  "bodycon": "Shirt",
+  "anarkali": "A-Line",
 };
 
 const LENGTH_MAP: Record<string, string> = {
@@ -571,7 +605,7 @@ const PRINT_MOTIF_MAP: Record<string, string> = {
   "abstract": "Abstract",
   "stripe": "Striped", "stripes": "Striped", "striped": "Striped",
   "check": "Checked", "checked": "Checked", "plaid": "Checked", "gingham": "Checked",
-  "animal": "Animal", "leopard": "Animal", "zebra": "Animal", "snake print": "Animal",
+  "leopard": "Animal", "zebra": "Animal", "snake print": "Animal",
   "tribal": "Tribal",
   "bandhani": "Bandhani",
   "leheriya": "Leheriya",
@@ -583,6 +617,8 @@ const PRINT_MOTIF_MAP: Record<string, string> = {
   "solid": "Solid", "plain": "Solid",
   // Embroidered products — Abstract is the accepted motif value in Myntra reference files
   "embroidered": "Abstract", "embroidery": "Abstract",
+  "ikat": "Ethnic Motifs", "kantha": "Ethnic Motifs", "block print": "Ethnic Motifs",
+  "animal print": "Animal", "animal": "Animal",
   "printed": "Floral", // default motif for printed — overridden if more specific keyword found
 };
 
@@ -600,6 +636,7 @@ const WASH_CARE_MAP: Record<string, string> = {
   "machine wash": "Machine Wash", "machine-wash": "Machine Wash",
 };
 
+// Kurtas hemline: High-Low | Straight | Curved | Asymmetric | Flared | Angular Accents
 const HEMLINE_MAP: Record<string, string> = {
   "high-low": "High-Low", "high low": "High-Low",
   "straight": "Straight",
@@ -607,6 +644,16 @@ const HEMLINE_MAP: Record<string, string> = {
   "asymmetric": "Asymmetric",
   "flared": "Flared",
   "angular": "Angular Accents",
+};
+
+// Dress hemline: only Flared | High-Low | Straight allowed
+const DRESS_HEMLINE_MAP: Record<string, string> = {
+  "flared": "Flared",
+  "high-low": "High-Low", "high low": "High-Low",
+  "straight": "Straight",
+  "curved": "Straight",     // no Curved in dress → Straight
+  "asymmetric": "High-Low", // no Asymmetric in dress → High-Low closest
+  "angular": "Straight",
 };
 
 const DESIGN_STYLING_MAP: Record<string, string> = {
@@ -944,7 +991,12 @@ function getValue(
 
   // ── Garment attributes ──
   if (hl === "occasion") return withVision(vision?.occasion, () => extractOccasion(tagMap, articleType));
-  if (hl === "print or pattern type") return withVision(vision?.pattern, () => extractPrintMotif(tagMap, description));
+  if (hl === "print or pattern type") {
+    const motif = extractPrintMotif(tagMap, description);
+    // Vision pattern values (Floral, Geometric etc.) are already valid motif values; snap "Printed"→Floral
+    const visionMotif = vision?.pattern ? (snapToMap(vision.pattern, PRINT_MOTIF_MAP) || vision.pattern) : "";
+    return visionMotif || motif;
+  }
   if (hl === "pattern") return withVision(vision?.pattern, () => extractPattern(tagMap, description));
   if (hl === "fabric") {
     const isDress = articleType.toLowerCase().includes("dress");
@@ -965,8 +1017,15 @@ function getValue(
   if (hl === "knit or woven") return tagMap["knit_or_woven"] || tagMap["fabric_type"] || "";
   if (hl === "sleeve length") return withVision(vision?.sleeveLength, () => extractSleeveLength(tagMap, description));
   if (hl === "sleeve styling") return withVision(vision?.sleeveStyling, () => extractSleeveStyling(tagMap, description));
-  if (hl === "neck") return withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
-  if (hl === "shape") return withVision(vision?.shape, () => extractShape(tagMap, description));
+  if (hl === "neck") {
+    const neckVal = withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
+    return snapNeck(neckVal, articleType);
+  }
+  if (hl === "shape") {
+    const isDress = articleType.toLowerCase().includes("dress");
+    if (isDress) return withVision(vision?.shape, () => snapToMap(tagMap["shape"] || tagMap["silhouette"] || description, DRESS_SHAPE_MAP));
+    return withVision(vision?.shape, () => extractShape(tagMap, description));
+  }
   if (hl === "length") {
     const isDress = articleType.toLowerCase().includes("dress");
     if (isDress) {
@@ -977,7 +1036,11 @@ function getValue(
     const explicitLength = tagMap["length"] || tagMap["garment_length"] || "";
     return vision?.length || (explicitLength ? snapToMap(explicitLength, LENGTH_MAP) : "");
   }
-  if (hl === "hemline") return withVision(vision?.hemline, () => snapToMap(tagMap["hemline"] || "", HEMLINE_MAP));
+  if (hl === "hemline") {
+    const isDress = articleType.toLowerCase().includes("dress");
+    const hMap = isDress ? DRESS_HEMLINE_MAP : HEMLINE_MAP;
+    return withVision(vision?.hemline, () => snapToMap(tagMap["hemline"] || "", hMap));
+  }
   if (hl === "slit detail") return tagMap["slit_detail"] || tagMap["slit"] || "";
   if (hl === "ornamentation") return tagMap["ornamentation"] || "";
   if (hl === "technique") return tagMap["technique"] || "";
@@ -1012,7 +1075,9 @@ function getValue(
   if (hl === "bottom fabric") return normaliseFabric(tagMap["bottom_fabric"] || "", true) || extractFabric(tagMap, description, true, false, product.title);
   if (hl === "top type") {
     const isCoOrd = articleType.toLowerCase().includes("co-ord") || articleType.toLowerCase().includes("coord");
-    return withVision(vision?.topType, () => isCoOrd ? "Top" : "Kurta");
+    const TOP_TYPE_MAP: Record<string, string> = { "kurta": "Kurta", "kurti": "Kurti", "top": "Top" };
+    const raw = vision?.topType || (isCoOrd ? "Top" : "Kurta");
+    return snapToMap(raw, TOP_TYPE_MAP) || (isCoOrd ? "Top" : "Kurta");
   }
   if (hl === "bottom type") {
     const isCoOrd = articleType.toLowerCase().includes("co-ord") || articleType.toLowerCase().includes("coord");
@@ -1020,7 +1085,21 @@ function getValue(
     const map = isCoOrd ? BOTTOM_TYPE_MAP_COORDS : BOTTOM_TYPE_MAP_SETS;
     return withVision(vision?.bottomType, () => snapToMap(raw, map) || (isCoOrd ? "Trousers" : "Trousers"));
   }
-  if (hl === "top pattern") return withVision(vision?.pattern, () => extractPattern(tagMap, description)); // Pattern col — Embroidered/Printed valid
+  if (hl === "top pattern") {
+    // Valid: Printed | Embroidered | Solid | Dyed | Self Design | Yoke Design | Striped | Colourblocked | Woven Design | Checked
+    const TOP_PATTERN_MAP: Record<string, string> = {
+      "embroidered": "Embroidered", "embroidery": "Embroidered",
+      "yoke design": "Yoke Design", "yoke": "Yoke Design",
+      "colourblock": "Colourblocked", "colorblock": "Colourblocked",
+      "stripe": "Striped", "striped": "Striped",
+      "check": "Checked", "checked": "Checked",
+      "woven": "Woven Design",
+      "dyed": "Dyed", "tie and dye": "Dyed",
+      "solid": "Solid", "plain": "Solid",
+    };
+    const patternVal = withVision(vision?.pattern, () => extractPattern(tagMap, description));
+    return snapToMap(patternVal, TOP_PATTERN_MAP) || "Printed";
+  }
   if (hl === "bottom pattern") return tagMap["bottom_pattern"] || "Printed";
   if (hl === "bottom closure") return "Slip-On";
   if (hl === "top closure") return "";
@@ -1066,7 +1145,7 @@ function getValue(
   if (hl === "contact brand or retailer for pre-sales product queries") return "";
   if (hl.startsWith("bis")) return "";
   if (hl === "body shape id") return "";
-  if (hl === "surface styling") return snapToMap(description, { "embroid": "Embroidered", "embellish": "Embellished", "lace": "Lace Inserts", "gather": "Gathers", "tie": "Tie-Ups", "layered": "Layered" }) || "NA";
+  if (hl === "surface styling") return snapToMap(tagMap["surface_styling"] || description, { "embroid": "Embroidered", "embellish": "Embellished", "lace": "Lace Inserts", "gather": "Gathered or Pleated", "pleat": "Gathered or Pleated", "ruffle": "Ruffles", "smock": "Smocked", "tie": "Tie-Ups", "layered": "Layered", "sequin": "Sequined" }) || "NA";
 
   // ── Measurements ──
   if (hl === "across shoulder ( inches )") return measurements.shoulder;
