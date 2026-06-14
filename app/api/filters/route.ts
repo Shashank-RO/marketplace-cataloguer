@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "@/lib/token-store";
 
 // In-memory cache — filters almost never change, refresh every 10 minutes
 let cachedFilters: { collections: string[]; tags: string[]; types: string[] } | null = null;
 let cacheExpiry = 0;
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("shopify_token")?.value || process.env.SHOPIFY_ADMIN_TOKEN;
+  const token = req.cookies.get("shopify_token")?.value || await getToken();
   const domain = process.env.SHOPIFY_STORE_DOMAIN;
 
   // Serve from cache if still fresh
@@ -46,11 +47,13 @@ export async function GET(req: NextRequest) {
       .sort();
 
     const uniqueTags = Array.from(new Set(tags));
+    // ZKP collections: ZKP followed by only digits (e.g. ZKP1190)
     const collections = uniqueTags
       .filter((t) => /^zkp\d+$/i.test(t))
       .map((t) => t.toUpperCase())
       .sort();
-    const otherTags = uniqueTags.filter((t) => !/^zkp\d+$/i.test(t)).sort();
+    // Exclude ZKP-prefixed tags (both pure-digit and mixed like ZKP1190BM2049) from tag suggestions
+    const otherTags = uniqueTags.filter((t) => !/^zkp/i.test(t)).sort();
 
     cachedFilters = { collections, tags: otherTags, types };
     cacheExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes

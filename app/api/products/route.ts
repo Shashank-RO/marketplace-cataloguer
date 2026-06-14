@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchProducts, fetchProductsFiltered } from "@/lib/shopify";
+import { getToken } from "@/lib/token-store";
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("shopify_token")?.value || process.env.SHOPIFY_ADMIN_TOKEN;
+  const token = req.cookies.get("shopify_token")?.value || await getToken();
   if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
