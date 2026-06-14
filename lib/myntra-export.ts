@@ -1001,7 +1001,10 @@ function getValue(
   if (hl === "ai label") return "";
 
   // ── Garment attributes ──
-  if (hl === "occasion") return withVision(vision?.occasion, () => extractOccasion(tagMap, articleType));
+  if (hl === "occasion") {
+    const vOccasion = vision?.occasion ? (snapToMap(vision.occasion, OCCASION_MAP) || vision.occasion) : "";
+    return vOccasion || extractOccasion(tagMap, articleType);
+  }
   if (hl === "print or pattern type") {
     const motif = extractPrintMotif(tagMap, description);
     // Vision pattern values (Floral, Geometric etc.) are already valid motif values; snap "Printed"→Floral
@@ -1026,10 +1029,14 @@ function getValue(
     return snapToMap(fabricDerived, FABRIC_TYPE_MAP) || "NA";
   }
   if (hl === "knit or woven") return tagMap["knit_or_woven"] || tagMap["fabric_type"] || "";
-  if (hl === "sleeve length") return withVision(vision?.sleeveLength, () => extractSleeveLength(tagMap, description));
+  if (hl === "sleeve length") {
+    const vSleeve = vision?.sleeveLength ? (snapToMap(vision.sleeveLength, SLEEVE_LENGTH_MAP) || vision.sleeveLength) : "";
+    return vSleeve || extractSleeveLength(tagMap, description);
+  }
   if (hl === "sleeve styling") return withVision(vision?.sleeveStyling, () => extractSleeveStyling(tagMap, description));
   if (hl === "neck") {
-    const neckVal = withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
+    const rawNeck = withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
+    const neckVal = snapToMap(rawNeck, NECK_MAP) || rawNeck;
     return snapNeck(neckVal, articleType);
   }
   if (hl === "shape") {
@@ -1057,7 +1064,10 @@ function getValue(
   if (hl === "technique") return tagMap["technique"] || "";
   if (hl === "weave pattern") return tagMap["weave_pattern"] || "";
   if (hl === "weave type") return tagMap["weave_type"] || "";
-  if (hl === "design styling") return withVision(vision?.designStyling, () => snapToMap(tagMap["design_styling"] || description, DESIGN_STYLING_MAP));
+  if (hl === "design styling") {
+    const vDesign = vision?.designStyling ? (snapToMap(vision.designStyling, DESIGN_STYLING_MAP) || "") : "";
+    return vDesign || snapToMap(tagMap["design_styling"] || description, DESIGN_STYLING_MAP);
+  }
   if (hl === "wash care") {
     const wc = extractWashCare(tagMap, description);
     // Also derive from fabric if no explicit tag
