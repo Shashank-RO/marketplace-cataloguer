@@ -123,6 +123,11 @@ export async function fetchProductsFiltered(
   if (filters.productType) {
     parts.push(`product_type:${filters.productType}`);
   }
+  // SKU search: use Shopify sku: query so we search the whole catalogue, not just first page
+  if (filters.skus.length > 0) {
+    const skuPart = filters.skus.map((s) => `sku:${s}*`).join(" OR ");
+    parts.push(filters.skus.length > 1 ? `(${skuPart})` : skuPart);
+  }
 
   const queryString = parts.join(" AND ");
 
@@ -225,10 +230,13 @@ export async function fetchProductsFiltered(
       } as ShopifyProduct;
     })
     .filter((p: ShopifyProduct) => {
-      // SKU filter (applied in memory after GraphQL fetch)
+      // SKU filter — prefix match so "ZKP1184BM1903" finds "ZKP1184BM1903-XS" etc.
       if (filters.skus.length === 0) return true;
-      const variantSkus = p.variants.map((v) => v.sku?.trim()).filter(Boolean);
-      return filters.skus.some((s) => variantSkus.includes(s));
+      const variantSkus = p.variants.map((v) => v.sku?.trim().toLowerCase()).filter(Boolean);
+      return filters.skus.some((s) => {
+        const sl = s.toLowerCase();
+        return variantSkus.some((vs) => vs === sl || vs.startsWith(sl + "-") || vs.startsWith(sl));
+      });
     });
 
   const pageInfo = data.products.pageInfo;
