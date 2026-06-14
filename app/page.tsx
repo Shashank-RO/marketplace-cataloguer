@@ -376,9 +376,38 @@ export default function Home() {
     });
   };
 
-  const toggleAll = () => {
-    if (selected.size === filtered.length && filtered.length > 0) {
-      setSelected(new Set());
+  const [loadingAll, setLoadingAll] = useState(false);
+
+  const toggleAll = async () => {
+    if (selected.size > 0) { setSelected(new Set()); return; }
+
+    // If there are more pages, fetch them all first
+    if (nextCursor) {
+      setLoadingAll(true);
+      try {
+        const allProducts = [...products];
+        let cur: string | null = nextCursor;
+        while (cur) {
+          const params = new URLSearchParams();
+          params.set("cursor", cur);
+          const f = activeFiltersRef.current;
+          if (f) {
+            f.collections.forEach((c) => params.append("collection", c));
+            f.tags.forEach((t) => params.append("tag", t));
+            f.skus.forEach((s) => params.append("sku", s));
+            if (f.type) params.set("type", f.type);
+          }
+          const res = await fetch(`/api/products?${params}`);
+          const data = await res.json();
+          allProducts.push(...data.products);
+          cur = data.nextCursor;
+        }
+        setProducts(allProducts);
+        setNextCursor(null);
+        setSelected(new Set(allProducts.map((p) => p.id)));
+      } finally {
+        setLoadingAll(false);
+      }
     } else {
       setSelected(new Set(filtered.map((p) => p.id)));
     }
@@ -715,8 +744,8 @@ export default function Home() {
                 Clear All
               </button>
             )}
-            <button onClick={toggleAll} className={`text-sm text-[#FF3F6C] hover:underline font-medium whitespace-nowrap ${selected.size > 0 ? "" : "ml-auto"}`}>
-              Select All
+            <button onClick={toggleAll} disabled={loadingAll} className={`text-sm text-[#FF3F6C] hover:underline font-medium whitespace-nowrap ${selected.size > 0 ? "" : "ml-auto"} disabled:opacity-50`}>
+              {loadingAll ? "Loading…" : "Select All"}
             </button>
           </div>
 
