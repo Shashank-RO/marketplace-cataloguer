@@ -422,6 +422,8 @@ const FABRIC_MAP_DRESS: [string, string][] = [
   ["cotton blend", "Cotton"],
   ["cotton silk", "Silk"],
   ["cotton", "Cotton"],
+  ["modal satin", "Viscose Rayon"],  // Modal Satin → Viscose Rayon (no Modal/Satin in dress sheet)
+  ["modal", "Viscose Rayon"],
   ["liva", "Liva"],
   ["livaeco", "Livaeco"],
   ["viscose rayon", "Viscose Rayon"],
@@ -439,6 +441,8 @@ const FABRIC_MAP_DRESS: [string, string][] = [
   ["pure silk", "Silk"],
   ["silk blend", "Silk"],
   ["art silk", "Poly Silk"],
+  ["silk satin", "Silk"],
+  ["satin", "Poly Silk"],            // Generic satin → Poly Silk (closest in dress sheet)
   ["silk", "Silk"],
   ["linen blend", "Linen Blend"],
   ["linen", "Linen"],
@@ -630,12 +634,20 @@ function snapToMap(raw: string, map: Record<string, string>): string {
 }
 
 /** Extract fabric from tags or description text, normalised to Myntra values */
-function extractFabric(tagMap: Record<string, string>, description = "", forSets = false, forDress = false): string {
+function extractFabric(tagMap: Record<string, string>, description = "", forSets = false, forDress = false, title = ""): string {
   const raw = tagMap["fabric"] || tagMap["material"] || tagMap["fabric1"] || "";
   if (raw) return normaliseFabric(raw, forSets, forDress);
   // Fallback: parse "Material XYZ" from description
   const match = description.match(/\bMaterial\s+([A-Za-z][A-Za-z\s]{1,30}?)(?:\.|,|$)/i);
   if (match) return normaliseFabric(match[1].trim(), forSets, forDress);
+  // Last resort: scan title for known fabric keywords (longest match first)
+  if (title) {
+    const map = forDress ? FABRIC_MAP_DRESS : forSets ? FABRIC_MAP_SETS : FABRIC_MAP;
+    const titleLower = title.toLowerCase();
+    for (const [key, val] of map) {
+      if (titleLower.includes(key)) return val;
+    }
+  }
   return "";
 }
 
@@ -936,7 +948,7 @@ function getValue(
   if (hl === "pattern") return withVision(vision?.pattern, () => extractPattern(tagMap, description));
   if (hl === "fabric") {
     const isDress = articleType.toLowerCase().includes("dress");
-    return extractFabric(tagMap, description, false, isDress);
+    return extractFabric(tagMap, description, false, isDress, product.title);
   }
   if (hl === "fabric 2" || hl === "fabric 3") return "";
   if (hl === "fabric purity") return tagMap["fabric_purity"] || "";
@@ -996,8 +1008,8 @@ function getValue(
   if (hl === "multipack set") return "NA";
 
   // ── Co-Ord / Set specific ──
-  if (hl === "top fabric") return extractFabric(tagMap, description, true);
-  if (hl === "bottom fabric") return normaliseFabric(tagMap["bottom_fabric"] || "", true) || extractFabric(tagMap, description, true);
+  if (hl === "top fabric") return extractFabric(tagMap, description, true, false, product.title);
+  if (hl === "bottom fabric") return normaliseFabric(tagMap["bottom_fabric"] || "", true) || extractFabric(tagMap, description, true, false, product.title);
   if (hl === "top type") {
     const isCoOrd = articleType.toLowerCase().includes("co-ord") || articleType.toLowerCase().includes("coord");
     return withVision(vision?.topType, () => isCoOrd ? "Top" : "Kurta");
