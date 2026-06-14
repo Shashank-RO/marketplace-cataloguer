@@ -1408,7 +1408,9 @@ export async function fillMyntraTemplate(
       const description = stripHtml(product.body_html);
       // Use original full-resolution image URLs (strip thumbnail suffix)
       const imageUrls = product.images.map((img) =>
-        img.src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || ""),
+        img.src
+          .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")
+          .replace(/\.png(\?.*)?$/i, ".jpg$1"), // Myntra requires jpg; Shopify CDN serves png as jpg too
       );
 
       const vision = visionMap.get(product.id) ?? null;
