@@ -823,11 +823,19 @@ function extractShape(tagMap: Record<string, string>, description: string): stri
 
 /** Extract occasion from tags, snapped to Myntra values */
 function extractOccasion(tagMap: Record<string, string>, articleType = ""): string {
-  const val = tagMap["occasion"] || "";
-  if (val) return snapToMap(val, OCCASION_MAP) || "Daily";
   const at = articleType.toLowerCase();
+  // Sheets that allow Casual: Tunics, Co-Ords
+  const allowsCasual = at.includes("tunic") || at.includes("top") || at.includes("co-ord") || at.includes("coord");
+  const val = tagMap["occasion"] || "";
+  if (val) {
+    const snapped = snapToMap(val, OCCASION_MAP);
+    // If snapped to Daily but sheet allows Casual, keep Casual
+    if (!snapped && allowsCasual && val.toLowerCase().includes("casual")) return "Casual";
+    return snapped || (allowsCasual ? "Casual" : "Daily");
+  }
   if (at.includes("kurta set")) return "Fusion";
   if (at.includes("co-ord") || at.includes("coord")) return "Casual";
+  if (allowsCasual) return "Casual";
   return "Daily";
 }
 
