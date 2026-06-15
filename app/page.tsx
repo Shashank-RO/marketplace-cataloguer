@@ -4,6 +4,14 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { ShopifyProduct } from "@/lib/shopify";
 import { findMatchingSheet } from "@/lib/myntra-export";
 
+// ─── Nykaa template keys stored in localStorage ──────────────────────────────
+const NYKAA_TEMPLATE_KEYS = [
+  { key: "nykaa_kurtis",  label: "Kurtis & Kurtas" },
+  { key: "nykaa_tops",    label: "Tops" },
+  { key: "nykaa_dresses", label: "Ethnic Dresses" },
+  { key: "nykaa_sets",    label: "Salwar Suits & Sets" },
+] as const;
+
 // ─── Myntra Formats Modal ────────────────────────────────────────────────────
 
 const MYNTRA_CATEGORIES = [
@@ -207,6 +215,9 @@ function MyntraFormatsModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
+          {/* ── Nykaa section ── */}
+          <NykaaTemplatesSection />
+
         </div>
 
         {/* Hidden file inputs */}
@@ -214,6 +225,91 @@ function MyntraFormatsModal({ onClose }: { onClose: () => void }) {
         <input ref={combinedFileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleCombinedFileChange} />
       </div>
     </div>
+  );
+}
+
+// ─── Nykaa Templates Section (inside formats modal) ───────────────────────────
+
+function NykaaTemplatesSection() {
+  const [templates, setTemplates] = useState<Record<string, { name: string; uploadedAt: string; size: number } | null>>({});
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loaded: Record<string, { name: string; uploadedAt: string; size: number } | null> = {};
+    for (const { key } of NYKAA_TEMPLATE_KEYS) {
+      try {
+        const meta = localStorage.getItem(key + "_meta");
+        loaded[key] = meta ? JSON.parse(meta) : null;
+      } catch { loaded[key] = null; }
+    }
+    setTemplates(loaded);
+  }, []);
+
+  const handleUpload = (key: string, file: File) => {
+    setUploading(key);
+    const reader = new FileReader();
+    reader.onload = () => {
+      localStorage.setItem(key, reader.result as string);
+      const meta = { name: file.name, uploadedAt: new Date().toISOString(), size: file.size };
+      localStorage.setItem(key + "_meta", JSON.stringify(meta));
+      setTemplates((prev) => ({ ...prev, [key]: meta }));
+      setUploading(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemove = (key: string) => {
+    localStorage.removeItem(key);
+    localStorage.removeItem(key + "_meta");
+    setTemplates((prev) => ({ ...prev, [key]: null }));
+  };
+
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  return (
+    <>
+      <div className="px-6 py-2 bg-gray-50 border-b border-gray-200 border-t">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Nykaa</p>
+      </div>
+      {NYKAA_TEMPLATE_KEYS.map(({ key, label }) => {
+        const meta = templates[key];
+        return (
+          <div key={key} className="px-6 py-3 border-b border-gray-100 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800">{label}</p>
+              {meta ? (
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{meta.name} · {fmt(meta.uploadedAt)} · {(meta.size / 1024).toFixed(0)} KB</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-0.5">No template uploaded</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {meta && (
+                <button onClick={() => handleRemove(key)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+              )}
+              <button
+                onClick={() => fileRefs.current[key]?.click()}
+                disabled={uploading === key}
+                className="text-xs bg-pink-50 hover:bg-pink-100 text-pink-700 font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                {uploading === key ? "Saving…" : meta ? "Replace" : "Upload"}
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xlsm"
+                className="hidden"
+                ref={(el) => { fileRefs.current[key] = el; }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(key, f); e.target.value = ""; }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -232,6 +328,8 @@ export default function Home() {
   const [showFormats, setShowFormats] = useState(false);
   const [exportError, setExportError] = useState<{ missingTypes: { shopify: string; myntra: string }[] } | null>(null);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [exportingNykaa, setExportingNykaa] = useState(false);
+  const [showNykaaConfirm, setShowNykaaConfirm] = useState(false);
 
   function getCurrentSeason(): string {
     const m = new Date().getMonth() + 1;
@@ -244,6 +342,12 @@ export default function Home() {
   const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
   const [exportYear, setExportYear] = useState(String(new Date().getFullYear()));
   const [exportSeason, setExportSeason] = useState(getCurrentSeason());
+
+  const NYKAA_SEASONS = ["Spring/Summer", "Autumn/Winter"];
+  const [nykaaYear, setNykaaYear] = useState(String(new Date().getFullYear()));
+  const [nykaaSeason, setNykaaSeason] = useState(
+    (new Date().getMonth() + 1) <= 6 ? "Spring/Summer" : "Autumn/Winter"
+  );
 
   // ── Staged (pending) filter state ──
   const [stagedType, setStagedType] = useState("");
@@ -491,6 +595,50 @@ export default function Home() {
     }
   };
 
+  const exportNykaa = () => {
+    const missing = NYKAA_TEMPLATE_KEYS.filter(({ key }) => !localStorage.getItem(key));
+    if (missing.length > 0) {
+      alert(`Please upload Nykaa templates first via Marketplace Base Formats:\n${missing.map((m) => m.label).join(", ")}`);
+      return;
+    }
+    setShowNykaaConfirm(true);
+  };
+
+  const doExportNykaa = async (season: string) => {
+    setShowNykaaConfirm(false);
+    const templates: Record<string, string> = {};
+    for (const { key } of NYKAA_TEMPLATE_KEYS) {
+      templates[key.replace("nykaa_", "")] = localStorage.getItem(key) || "";
+    }
+
+    setExportingNykaa(true);
+    try {
+      const res = await fetch("/api/export-nykaa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productIds: Array.from(selected),
+          season,
+          templates,
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Export failed"); }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yy = String(now.getFullYear()).slice(-2);
+      a.href = url; a.download = `${dd}${mm}${yy} Nykaa-${Date.now()}.zip`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Nykaa export failed");
+    } finally {
+      setExportingNykaa(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50">
       {showFormats && <MyntraFormatsModal onClose={() => setShowFormats(false)} />}
@@ -533,6 +681,52 @@ export default function Home() {
               <button
                 onClick={() => doExport(exportYear, exportSeason)}
                 className="flex-1 py-2.5 rounded-lg bg-[#FF3F6C] text-white text-sm font-semibold hover:bg-[#e6345a]"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Nykaa export confirmation modal ── */}
+      {showNykaaConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-1">Confirm Nykaa Export</h3>
+            <p className="text-xs text-gray-500 mb-5">Season will be filled in for all exported products.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Year</label>
+                <select
+                  value={nykaaYear}
+                  onChange={(e) => setNykaaYear(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                >
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Season</label>
+                <select
+                  value={nykaaSeason}
+                  onChange={(e) => setNykaaSeason(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                >
+                  {NYKAA_SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowNykaaConfirm(false)}
+                className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => doExportNykaa(`${nykaaSeason} ${nykaaYear}`)}
+                className="flex-1 py-2.5 rounded-lg bg-pink-500 text-white text-sm font-semibold hover:bg-pink-600"
               >
                 Export
               </button>
@@ -607,6 +801,13 @@ export default function Home() {
               className="bg-[#FF3F6C] hover:bg-[#e0355d] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
             >
               {exporting ? "Exporting…" : `Export Myntra Format (${selected.size})`}
+            </button>
+            <button
+              onClick={exportNykaa}
+              disabled={selected.size === 0 || exportingNykaa}
+              className="bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
+            >
+              {exportingNykaa ? "Exporting…" : `Export Nykaa Format (${selected.size})`}
             </button>
           </div>
         </div>
