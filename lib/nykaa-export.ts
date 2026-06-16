@@ -399,7 +399,8 @@ type NykaaSheet = "Kurtis and Kurtas" | "Ethnic Dresses" | "Salwar Suits Sets Wo
 
 function getSheetForProductType(productType: string): NykaaSheet | null {
   const pt = productType.toLowerCase().trim();
-  if (pt.includes("kurta set") || pt.includes("kurta sets") || pt.includes("co-ord") || pt.includes("coord")) {
+  if (pt.includes("kurta set") || pt.includes("kurta sets") || pt.includes("co-ord") || pt.includes("coord") ||
+      pt === "sets" || pt === "set") {
     return "Salwar Suits Sets Women Girls";
   }
   if (pt === "kurtas" || pt === "kurta" || pt === "kurtis" || pt === "kurti") {
@@ -413,7 +414,9 @@ function getSheetForProductType(productType: string): NykaaSheet | null {
 function getSetsSubcategory(productType: string): string {
   const pt = productType.toLowerCase();
   if (pt.includes("co-ord") || pt.includes("coord")) return "Co-ord Set";
-  if (pt.includes("kurta set") || pt.includes("kurta sets")) return "Kurta Sets";
+  if (pt.includes("palazzo")) return "Palazzo sets";
+  if (pt.includes("sharara")) return "Sharara Sets";
+  if (pt.includes("anarkali")) return "Anarkali Sets";
   return "Kurta Sets";
 }
 
