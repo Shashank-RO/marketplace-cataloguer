@@ -16,18 +16,24 @@ const COUNTRY = "India";
 const AGE = "16 Years And Above";
 
 // Body measurements per size (to-fit)
+// Body measurements (to-fit); garmentMeasurements() adds 2" for ease
 const BODY_CHART: Record<string, { bust: number; chest: number; waist: number; hip: number; shoulder: number }> = {
-  XS:  { bust: 32, chest: 32, waist: 30, hip: 36, shoulder: 13.5 },
-  S:   { bust: 34, chest: 34, waist: 32, hip: 38, shoulder: 14   },
-  M:   { bust: 36, chest: 36, waist: 34, hip: 40, shoulder: 14.5 },
-  L:   { bust: 38, chest: 38, waist: 36, hip: 42, shoulder: 15   },
-  XL:  { bust: 40, chest: 40, waist: 38, hip: 44, shoulder: 15.5 },
-  XXL: { bust: 42, chest: 42, waist: 40, hip: 46, shoulder: 16   },
+  XS:    { bust: 32, chest: 32, waist: 30, hip: 36, shoulder: 13.5 },
+  S:     { bust: 34, chest: 34, waist: 32, hip: 38, shoulder: 14   },
+  M:     { bust: 36, chest: 36, waist: 34, hip: 40, shoulder: 14.5 },
+  L:     { bust: 38, chest: 38, waist: 36, hip: 42, shoulder: 15   },
+  XL:    { bust: 40, chest: 40, waist: 38, hip: 44, shoulder: 15.5 },
+  XXL:   { bust: 42, chest: 42, waist: 40, hip: 46, shoulder: 16   },
+  "3XL": { bust: 44, chest: 44, waist: 42, hip: 48, shoulder: 17   },
+  "4XL": { bust: 46, chest: 46, waist: 44, hip: 50, shoulder: 17   },
+  "5XL": { bust: 48, chest: 48, waist: 46, hip: 52, shoulder: 18   },
+  "6XL": { bust: 50, chest: 50, waist: 48, hip: 54, shoulder: 18   },
 };
 
 // Garment = body + 2 for bust/chest/waist/hip; shoulder same
 function garmentMeasurements(size: string) {
-  const b = BODY_CHART[size] || BODY_CHART["S"];
+  const b = BODY_CHART[size];
+  if (!b) throw new Error(`Unknown size "${size}" — no measurements available. Cannot export.`);
   return {
     bust:     b.bust + 2,
     chest:    b.chest + 2,
@@ -57,24 +63,45 @@ function snapToMap(raw: string, map: Record<string, string>): string {
 }
 
 const NYKAA_COLOR_MAP: Record<string, string> = {
-  "beige": "Beige", "cream": "Cream", "off white": "Off White", "ivory": "Ivory",
-  "white": "White", "nude": "Nude",
+  // English names
+  "off white": "Off White", "white gold": "White Gold", "rose gold": "Rose Gold",
+  "navy blue": "Navy Blue", "multi-color": "Multi-Color", "multicolour": "Multi-Color",
+  "multicolor": "Multi-Color", "multi color": "Multi-Color",
+  "beige": "Beige", "cream": "Cream", "ivory": "Ivory", "white": "White", "nude": "Nude",
   "black": "Black", "charcoal": "Charcoal",
-  "blue": "Blue", "navy": "Navy Blue", "indigo": "Indigo", "teal": "Teal",
-  "turquoise": "Turquoise", "aqua": "Aqua",
-  "green": "Green", "olive": "Olive",
-  "red": "Red", "maroon": "Maroon", "burgundy": "Burgundy", "wine": "Wine",
-  "pink": "Pink", "mauve": "Mauve", "magenta": "Magenta",
-  "orange": "Orange", "rust": "Rust", "coral": "Coral", "peach": "Peach",
-  "yellow": "Yellow", "mustard": "Mustard",
-  "purple": "Purple", "lavender": "Lavender",
-  "brown": "Brown", "tan": "Tan", "taupe": "Taupe",
+  "navy": "Navy Blue", "indigo": "Indigo", "teal": "Teal",
+  "turquoise": "Turquoise", "aqua": "Aqua", "blue": "Blue",
+  "olive": "Olive", "green": "Green",
+  "burgundy": "Burgundy", "maroon": "Maroon", "wine": "Wine", "red": "Red",
+  "mauve": "Mauve", "magenta": "Magenta", "pink": "Pink",
+  "coral": "Coral", "peach": "Peach", "rust": "Rust", "orange": "Orange",
+  "mustard": "Mustard", "yellow": "Yellow",
+  "lavender": "Lavender", "purple": "Purple",
+  "taupe": "Taupe", "tan": "Tan", "brown": "Brown",
   "grey": "Grey", "gray": "Grey",
-  "gold": "Gold", "rose gold": "Rose Gold", "white gold": "White Gold",
-  "silver": "Silver", "metallic": "Metallic", "copper": "Copper", "bronze": "Bronze",
-  "blonde": "Blonde",
-  "multi": "Multi-Color", "multicolou": "Multi-Color", "multicolor": "Multi-Color",
+  "metallic": "Metallic", "silver": "Silver", "copper": "Copper", "bronze": "Bronze",
+  "gold": "Gold", "blonde": "Blonde",
   "khaki": "Khaki",
+  // Indian colour names
+  "haldi": "Mustard", "peela": "Yellow", "peeli": "Yellow",
+  "laal": "Red", "surkh": "Red",
+  "gulabi": "Pink", "gulab": "Pink",
+  "neela": "Blue", "neel": "Blue",
+  "hari": "Green", "sabz": "Green", "mehendi": "Green", "mehndi": "Green",
+  "safed": "White", "shwet": "White",
+  "kala": "Black", "kaala": "Black",
+  "narangi": "Orange",
+  "jamuni": "Purple", "bainganee": "Purple",
+  "sunehra": "Gold", "sona": "Gold",
+  "chandi": "Silver",
+  "rani pink": "Magenta", "rani": "Magenta",
+  "kesari": "Orange",
+  "sandalwood": "Beige", "sandal": "Beige",
+  "champagne": "Beige",
+  "terracotta": "Rust",
+  "brick": "Rust",
+  "mango": "Mustard",
+  "saffron": "Orange",
 };
 
 function snapColor(raw: string): string {
@@ -458,6 +485,17 @@ export async function fillNykaaTemplates(
   // Track which sheets got data
   const sheetsUsed = new Set<NykaaSheet>();
 
+  // Pre-compute Design Code groups: products sharing the same base title (strip " - Colour" suffix)
+  // get the same Design Code — the VAN of the first product in that group.
+  const designCodeMap = new Map<string, string>(); // productId → groupVAN
+  const baseNameToDesignCode = new Map<string, string>();
+  for (const p of products) {
+    const baseName = p.title.replace(/\s*-\s*[^-]+$/, "").trim().toLowerCase();
+    const van = extractArticleNumber(p.variants[0]?.sku || "");
+    if (!baseNameToDesignCode.has(baseName)) baseNameToDesignCode.set(baseName, van);
+    designCodeMap.set(p.id, baseNameToDesignCode.get(baseName)!);
+  }
+
   for (const product of products) {
     const sheetName = getSheetForProductType(product.product_type || "");
     if (!sheetName) continue;
@@ -487,8 +525,9 @@ export async function fillNykaaTemplates(
     const fabric = extractFabric(tagMap, description, product.title);
     const hsn = extractHSN(fabric);
     const care = extractCare(tagMap, description);
+    // Colour: vision dominantColor is already a valid Nykaa value; fall back to keyword-map matching
     const rawColour = extractColourFromTitle(product.title) || product.variants[0]?.option2 || product.variants[0]?.option1 || "";
-    const colour = snapColor(rawColour);
+    const colour = (vision?.dominantColor && vision.dominantColor.trim()) ? vision.dominantColor.trim() : snapColor(rawColour);
     const van = extractArticleNumber(product.variants[0]?.sku || "");
 
     // Vision-derived attributes
@@ -510,10 +549,15 @@ export async function fillNykaaTemplates(
       NYKAA_TYPE_OF_WORK_MAP,
     ) || pattern;
 
+    // Per-sheet specific
+    const isSet = sheetName === "Salwar Suits Sets Women Girls";
+    const isDress = sheetName === "Ethnic Dresses";
+    const isTops = sheetName === "Tops";
+
     const fit = snapToMap(
       tagMap["fit"] || tagMap["silhouette"] || tagMap["shape"] || "",
       NYKAA_FIT_MAP,
-    ) || (vision?.shape ? (snapToMap(vision.shape, NYKAA_FIT_MAP) || "Regular") : "Regular");
+    ) || ((!isSet && vision?.shape) ? (snapToMap(vision.shape, NYKAA_FIT_MAP) || "Regular") : "Regular");
 
     const closure = snapToMap(
       tagMap["closure"] || tagMap["fastening"] || "",
@@ -529,11 +573,6 @@ export async function fillNykaaTemplates(
 
     const packContains = getPackContains(productType);
 
-    // Per-sheet specific
-    const isSet = sheetName === "Salwar Suits Sets Women Girls";
-    const isDress = sheetName === "Ethnic Dresses";
-    const isTops = sheetName === "Tops";
-
     const dressShape = isDress
       ? (snapToMap(tagMap["shape"] || tagMap["silhouette"] || description, NYKAA_DRESS_SHAPE_MAP) ||
          (vision?.shape ? snapToMap(vision.shape, NYKAA_DRESS_SHAPE_MAP) : "") || "A-Line")
@@ -545,13 +584,50 @@ export async function fillNykaaTemplates(
 
     const setsSubcategory = isSet ? getSetsSubcategory(productType) : "";
 
-    const bottomsType = isSet
-      ? (snapToMap(tagMap["bottom_type"] || tagMap["bottom"] || "", NYKAA_BOTTOMS_MAP) || "Pants")
-      : "";
+    const bottomsType = isSet ? (() => {
+      // 1. Explicit tag
+      const explicit = snapToMap(tagMap["bottom_type"] || tagMap["bottom"] || "", NYKAA_BOTTOMS_MAP);
+      if (explicit) return explicit;
+      // 2. Vision AI bottomType
+      const visionBottom = vision?.bottomType ? snapToMap(vision.bottomType, NYKAA_BOTTOMS_MAP) : "";
+      if (visionBottom) return visionBottom;
+      // 3. Infer from product type string
+      const pt = productType.toLowerCase();
+      if (pt.includes("palazzo")) return "Palazzos";
+      if (pt.includes("sharara")) return "Sharara";
+      if (pt.includes("skirt")) return "Skirts";
+      if (pt.includes("dhoti")) return "Dhotis";
+      if (pt.includes("churidar")) return "Churidar";
+      if (pt.includes("pyjama")) return "Pyjama";
+      if (pt.includes("salwar")) return "Salwars";
+      if (pt.includes("legging")) return "Leggings";
+      return "Pants";
+    })() : "";
 
-    const legStyle = isSet
-      ? (snapToMap(tagMap["leg_style"] || tagMap["bottom_type"] || "", NYKAA_LEG_STYLE_MAP) || "Straight")
-      : "";
+    const legStyle = isSet ? (() => {
+      // 1. Explicit tag
+      const explicit = snapToMap(tagMap["leg_style"] || "", NYKAA_LEG_STYLE_MAP);
+      if (explicit) return explicit;
+      // 2. Vision AI bottomType → leg style inference
+      const visionBt = (vision?.bottomType || "").toLowerCase();
+      if (visionBt) {
+        if (visionBt.includes("palazzo") || visionBt.includes("sharara")) return "Flared";
+        if (visionBt.includes("salwar")) return "Straight";
+        if (visionBt.includes("wide")) return "Wide";
+        if (visionBt.includes("slim") || visionBt.includes("skinny")) return "Slim";
+        if (visionBt.includes("churidar") || visionBt.includes("tapered")) return "Tapered";
+        if (visionBt.includes("cropped")) return "Cropped";
+      }
+      // 3. Infer from tag / product type string
+      const bt = (tagMap["bottom_type"] || tagMap["bottom"] || productType).toLowerCase();
+      if (bt.includes("palazzo") || bt.includes("sharara") || bt.includes("flared")) return "Flared";
+      if (bt.includes("salwar")) return "Straight";
+      if (bt.includes("wide")) return "Wide";
+      if (bt.includes("slim") || bt.includes("skinny")) return "Slim";
+      if (bt.includes("tapered") || bt.includes("churidar")) return "Tapered";
+      if (bt.includes("cropped")) return "Cropped";
+      return "Straight";
+    })() : "";
 
     const topwearLength = isTops
       ? (snapToMap(tagMap["length"] || lengthCategory, NYKAA_TOPWEAR_LENGTH_MAP) || "Regular")
@@ -596,7 +672,7 @@ export async function fillNykaaTemplates(
       set("manufacturer address", MANUFACTURER_ADDRESS);
       set("brand  size", size);
       set("multipack set", MULTIPACK);
-      set("design code", van);
+      set("design code", designCodeMap.get(product.id) || van);
       set("occasion", OCCASION);
       set("season", options.season);
       set("care instruction", care);
@@ -613,7 +689,6 @@ export async function fillNykaaTemplates(
       set("type of work", typeOfWork);
       set("neckline", neckline);
       set("model details", modelDetails);
-      set("age", AGE);
 
       // Pocket description
       const hasPocket = description.toLowerCase().includes("pocket") || (tagMap["pockets"] && tagMap["pockets"] !== "0");
@@ -632,9 +707,7 @@ export async function fillNykaaTemplates(
         set("leg style", legStyle);
         set("rise style", "Mid Waist");
         if (lengthInches) set("length (inches)", lengthInches);
-        set("bottom length for garment (inches)", body.hip); // approximate
         set("inseam for garment (inches)", 27);
-        set("bottom length for body (inches)", body.hip);
         set("inseam for body (inches)", 27);
       }
 

@@ -14,6 +14,7 @@ export interface VisionAttributes {
   bottomType: string;
   designStyling: string;
   patternCoverage: string;
+  dominantColor: string;
 }
 
 let _client: Anthropic | null = null;
@@ -41,6 +42,7 @@ topType: One of — "Kurta", "Top", "Tunic", "Blouse", "" (if not a set)
 bottomType: One of — "Trousers", "Palazzo", "Skirt", "Salwar", "Pant", "" (if not a set)
 designStyling: One of — "Regular", "Printed", "Embroidered", "Yoke Design", "Placement Print", "Solid", "" (if unclear)
 patternCoverage: Where is the embroidery/print concentrated? One of — "Yoke or Border" (embroidery/print only at neckline yoke or hem border), "Placement" (small placement print/embroidery at one spot), "Small" (scattered small motifs across less than 30% of garment), "Large" (heavy print/embroidery covering most of garment), "None" (solid/plain garment), "" (if unclear)
+dominantColor: The dominant/primary colour of the garment. Must be EXACTLY one of — "Aqua", "Beige", "Black", "Blonde", "Blue", "Bronze", "Brown", "Burgundy", "Charcoal", "Clear", "Copper", "Coral", "Cream", "Gold", "Green", "Grey", "Indigo", "Ivory", "Khaki", "Lavender", "Magenta", "Maroon", "Mauve", "Metallic", "Multi-Color", "Mustard", "Navy Blue", "Nude", "Off White", "Olive", "Orange", "Peach", "Pink", "Purple", "Red", "Rose Gold", "Rust", "Silver", "Tan", "Taupe", "Teal", "Transparent", "Turquoise", "White", "White Gold", "Wine", "Yellow"
 
 Return ONLY the JSON, no explanation.`;
 
