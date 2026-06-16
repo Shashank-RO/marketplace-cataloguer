@@ -436,7 +436,7 @@ export async function fillNykaaTemplates(
   },
   products: ShopifyProduct[],
   options: { season: string },
-): Promise<Buffer> {
+): Promise<{ buffer: Buffer; categories: string[] }> {
   // Load all 4 template workbooks
   const workbooks: Record<NykaaSheet, ExcelJS.Workbook> = {
     "Kurtis and Kurtas":            new ExcelJS.Workbook(),
@@ -694,10 +694,20 @@ export async function fillNykaaTemplates(
     "Tops": `${datePfx} Nykaa Tops.xlsx`,
   };
 
+  const categoryLabels: Record<NykaaSheet, string> = {
+    "Kurtis and Kurtas": "Kurtis",
+    "Ethnic Dresses": "Dresses",
+    "Salwar Suits Sets Women Girls": "Sets",
+    "Tops": "Tops",
+  };
+
+  const categories: string[] = [];
   for (const sheetName of sheetsUsed) {
     const buf = await workbooks[sheetName].xlsx.writeBuffer();
     zip.file(fileMap[sheetName], buf);
+    categories.push(categoryLabels[sheetName]);
   }
 
-  return await zip.generateAsync({ type: "nodebuffer" });
+  const buffer = await zip.generateAsync({ type: "nodebuffer" });
+  return { buffer, categories };
 }

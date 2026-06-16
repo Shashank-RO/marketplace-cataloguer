@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const toBuffer = (b64: string) => Buffer.from(b64.replace(/^data:[^;]+;base64,/, ""), "base64");
 
-    const zipBuffer = await fillNykaaTemplates(
+    const { buffer: zipBuffer, categories } = await fillNykaaTemplates(
       {
         kurtis:  toBuffer(templates.kurtis),
         tops:    toBuffer(templates.tops),
@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
     const dd = String(now.getDate()).padStart(2, "0");
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const yy = String(now.getFullYear()).slice(-2);
-    const filename = `${dd}${mm}${yy} Nykaa-${Date.now()}.zip`;
+    const catSuffix = categories.length > 0 ? ` ${categories.join(" ")}` : "";
+    const filename = `${dd}${mm}${yy} Nykaa${catSuffix}.zip`;
 
     return new NextResponse(zipBuffer as unknown as BodyInit, {
       headers: {
