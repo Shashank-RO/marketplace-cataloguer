@@ -402,11 +402,12 @@ function getSheetForProductType(productType: string): NykaaSheet | null {
   if (pt.includes("kurta set") || pt.includes("kurta sets") || pt.includes("co-ord") || pt.includes("coord")) {
     return "Salwar Suits Sets Women Girls";
   }
-  if (pt === "kurtas" || pt === "kurta" || pt === "kurtis" || pt === "kurti") {
+  if (pt.includes("dress")) return "Ethnic Dresses";
+  // Kurtas, Kurtis, Tunics, Tops all go into Kurtis and Kurtas sheet
+  if (pt === "kurtas" || pt === "kurta" || pt === "kurtis" || pt === "kurti" ||
+      pt === "tops" || pt === "top" || pt === "tunic" || pt === "tunics") {
     return "Kurtis and Kurtas";
   }
-  if (pt.includes("dress")) return "Ethnic Dresses";
-  if (pt === "tops" || pt === "top" || pt === "tunic" || pt === "tunics") return "Tops";
   return null;
 }
 
@@ -529,7 +530,8 @@ export async function fillNykaaTemplates(
     // Per-sheet specific
     const isSet = sheetName === "Salwar Suits Sets Women Girls";
     const isDress = sheetName === "Ethnic Dresses";
-    const isTops = sheetName === "Tops";
+    const isTunic = ["tops", "top", "tunic", "tunics"].includes(productType.toLowerCase().trim());
+    const kurtiSubcategory = isTunic ? "Tunics" : "Kurtas";
 
     const dressShape = isDress
       ? (snapToMap(tagMap["shape"] || tagMap["silhouette"] || description, NYKAA_DRESS_SHAPE_MAP) ||
@@ -550,9 +552,6 @@ export async function fillNykaaTemplates(
       ? (snapToMap(tagMap["leg_style"] || tagMap["bottom_type"] || "", NYKAA_LEG_STYLE_MAP) || "Straight")
       : "";
 
-    const topwearLength = isTops
-      ? (snapToMap(tagMap["length"] || lengthCategory, NYKAA_TOPWEAR_LENGTH_MAP) || "Regular")
-      : "";
 
     sheetsUsed.add(sheetName);
 
@@ -629,27 +628,25 @@ export async function fillNykaaTemplates(
         set("leg style", legStyle);
         set("rise style", "Mid Waist");
         if (lengthInches) set("length (inches)", lengthInches);
-        set("bottom length for garment (inches)", body.hip); // approximate
+        set("bottom length for garment (inches)", body.hip);
         set("inseam for garment (inches)", 27);
         set("bottom length for body (inches)", body.hip);
         set("inseam for body (inches)", 27);
       }
 
-      if (isTops) {
-        set("category classification", "Indianwear");
-        set("shirts tops and crop tops subcategory", "Tunics");
-        set("topwear length", topwearLength);
-        set("style bucket", "Fashion");
+      if (!isDress && !isSet) {
+        // Kurtis and Kurtas sheet (includes Tunics)
+        set("kurti kurta & tunics subcategory", kurtiSubcategory);
+        if (lengthInches) set("length (inches)", lengthInches);
       }
 
       // Garment measurements
       set("bust for garment (inches)", garment.bust);
       set("chest for garment (inches)", garment.chest);
       set("waist for garment (inches)", garment.waist);
-      if (!isTops) set("hip for garment (inches)", garment.hip);
+      set("hip for garment (inches)", garment.hip);
       set("shoulder for garment (inches)", garment.shoulder);
       if (sleeveLength && sleeveLength !== "Sleeveless") {
-        // Sleeve length inches per size
         const sleeveInches: Record<string, number> = { XS: 13.5, S: 14, M: 14.5, L: 15, XL: 15.5, XXL: 16 };
         set("sleeve length (inches)", sleeveInches[size] || 14);
       }
@@ -658,7 +655,7 @@ export async function fillNykaaTemplates(
       set("bust for body (inches)", body.bust);
       set("chest for body (inches)", body.chest);
       set("waist for body (inches)", body.waist);
-      if (!isTops) set("hip for body (inches)", body.hip);
+      set("hip for body (inches)", body.hip);
       set("shoulder for body (inches)", body.shoulder);
       if (lengthInches) {
         set("length (inches)", lengthInches);
@@ -693,14 +690,14 @@ export async function fillNykaaTemplates(
     "Kurtis and Kurtas": `${datePfx} Nykaa Kurtis.xlsx`,
     "Ethnic Dresses": `${datePfx} Nykaa Dresses.xlsx`,
     "Salwar Suits Sets Women Girls": `${datePfx} Nykaa Sets.xlsx`,
-    "Tops": `${datePfx} Nykaa Tops.xlsx`,
+    "Tops": `${datePfx} Nykaa Tops.xlsx`, // unused but keeps type complete
   };
 
   const categoryLabels: Record<NykaaSheet, string> = {
     "Kurtis and Kurtas": "Kurtis",
     "Ethnic Dresses": "Dresses",
     "Salwar Suits Sets Women Girls": "Sets",
-    "Tops": "Tops",
+    "Tops": "Tops", // unused
   };
 
   const categories: string[] = [];
