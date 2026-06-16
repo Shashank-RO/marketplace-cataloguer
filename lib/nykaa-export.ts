@@ -565,7 +565,10 @@ export async function fillNykaaTemplates(
     ) || "Pull On";
 
     // Length in inches from vision
-    const lengthCategory = vision?.length || "";
+    // For sets: use topLength (kurta top hem); for single garments: use overall length
+    const lengthCategory = isSet
+      ? (vision?.topLength || vision?.length || "")
+      : (vision?.length || "");
     const lengthInches = lengthCategoryToInches(lengthCategory);
 
     // Model details
