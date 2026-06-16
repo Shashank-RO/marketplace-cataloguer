@@ -563,7 +563,9 @@ export async function fillNykaaTemplates(
       const size = (variant.option1 ?? "S").toUpperCase();
       const body = BODY_CHART[size] || BODY_CHART["S"];
       const garment = garmentMeasurements(size);
-      const sku = variant.sku || `${product.id}-${variant.id}`;
+      const baseSku = variant.sku || `${product.id}-${variant.id}`;
+      const hasSizeSuffix = size && new RegExp(`-${size}$`, "i").test(baseSku);
+      const sku = hasSizeSuffix ? baseSku : size ? `${baseSku}-${size}` : baseSku;
 
       const colourFromOption = SIZE_PATTERN.test((variant.option1 ?? "").trim())
         ? (variant.option2 || "")
