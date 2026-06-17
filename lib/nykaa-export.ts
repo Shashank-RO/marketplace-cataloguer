@@ -10,7 +10,15 @@ const MANUFACTURER_ADDRESS = "Zakoopi Infotech Pvt Ltd, A-46, Sec 57, Noida,Utta
 const SHIPS_IN = "2";
 const NET_QTY = "1N";
 const MULTIPACK = "Single";
-const OCCASION = "Any Occasion";
+const NYKAA_OCCASION_MAP: Record<string, string> = {
+  "casual": "Casual", "daily": "Casual", "everyday": "Everyday Essentials",
+  "festive": "Festive", "wedding": "Wedding", "party": "Party",
+  "formal": "Formal", "work": "Work", "semi formal": "Semi Formal",
+  "fusion": "Fusion", "evening": "Evening Wear", "day wear": "Day Wear",
+  "resort": "Resort/Vacation", "vacation": "Resort/Vacation",
+  "sports": "Sports", "sporty": "Sporty", "winter": "Winter",
+  "nightwear": "Nightwear", "maternity": "Maternity", "travel": "Travel",
+};
 const GENDER = "Women";
 const BRAND = "Rustorange";
 const COUNTRY = "India";
@@ -385,11 +393,15 @@ function extractTagMap(tags: string): Record<string, string> {
   const map: Record<string, string> = {};
   for (const tag of tags.split(",")) {
     const t = tag.trim();
-    const idx = t.indexOf(":");
-    if (idx > 0) {
-      const k = t.slice(0, idx).trim().toLowerCase();
-      const v = t.slice(idx + 1).trim();
-      map[k] = v;
+    // Support both "key:value" and "Key_Value" formats
+    const colonIdx = t.indexOf(":");
+    if (colonIdx > 0) {
+      map[t.slice(0, colonIdx).trim().toLowerCase()] = t.slice(colonIdx + 1).trim();
+    } else {
+      const underIdx = t.indexOf("_");
+      if (underIdx > 0) {
+        map[t.slice(0, underIdx).trim().toLowerCase()] = t.slice(underIdx + 1).trim();
+      }
     }
   }
   return map;
@@ -548,7 +560,7 @@ export async function fillNykaaTemplates(
     const typeOfWork = snapToMap(
       tagMap["type_of_work"] || tagMap["work"] || tagMap["embellishment"] || description,
       NYKAA_TYPE_OF_WORK_MAP,
-    ) || pattern;
+    ) || (vision?.designStyling ? (snapToMap(vision.designStyling, NYKAA_TYPE_OF_WORK_MAP) || "") : "") || "Printed";
 
     // Per-sheet specific
     const isSet = sheetName === "Salwar Suits Sets Women Girls";
@@ -677,7 +689,7 @@ export async function fillNykaaTemplates(
       set("brand  size", size);
       set("multipack set", MULTIPACK);
       set("design code", designCodeMap.get(product.id) || van);
-      set("occasion", OCCASION);
+      set("occasion", snapToMap(tagMap["occasion"] || tagMap["use"] || "", NYKAA_OCCASION_MAP) || "Casual");
       set("season", options.season);
       set("care instruction", care);
       set("ships in days", SHIPS_IN);
