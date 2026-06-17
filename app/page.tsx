@@ -505,8 +505,8 @@ export default function Home() {
           const data = await res.json();
           allProducts.push(...data.products);
           cur = data.nextCursor;
-          if (allProducts.length > 100) {
-            alert(`Too many products to select at once (more than 100). Please narrow your filters first.`);
+          if (allProducts.length > 150) {
+            alert(`Too many products to select at once (more than 150). Please narrow your filters first.`);
             setLoadingAll(false);
             return;
           }
