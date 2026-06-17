@@ -6,5 +6,5 @@ const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "djrmra08z";
  */
 export function cloudinaryFetchUrl(sourceUrl: string): string {
   const transformation = "c_fill,ar_3:4,g_face";
-  return `https://res.cloudinary.com/${CLOUD_NAME}/image/fetch/${transformation}/${encodeURI(sourceUrl)}`;
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/fetch/${transformation}/${encodeURIComponent(sourceUrl)}`;
 }
