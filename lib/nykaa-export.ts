@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { analyzeProductImage } from "./vision";
 import type { ShopifyProduct } from "./shopify";
+import { cloudinaryFetchUrl } from "./cloudinary";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -744,12 +745,12 @@ export async function fillNykaaTemplates(
         set("length for body (inches)", lengthInches);
       }
 
-      // Images (up to 9 slots: front, back, additional 1–8 → cols front image … additional image 8)
+      // Images — use Cloudinary fetch URLs (3:4 portrait crop, face gravity)
       const imgSlots = ["front image", "back image", "additional image 1", "additional image 2",
         "additional image 3", "additional image 4", "additional image 5", "additional image 6",
         "additional image 7", "additional image 8"];
       imgSlots.forEach((slot, i) => {
-        if (imageUrls[i]) set(slot, imageUrls[i]);
+        if (imageUrls[i]) set(slot, cloudinaryFetchUrl(imageUrls[i]));
       });
 
       row.commit();
