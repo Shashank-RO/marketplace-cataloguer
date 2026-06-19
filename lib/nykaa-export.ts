@@ -111,6 +111,17 @@ const NYKAA_COLOR_MAP: Record<string, string> = {
   "brick": "Rust",
   "mango": "Mustard",
   "saffron": "Orange",
+  "many hues": "Multi-Color", "many-hues": "Multi-Color", "manyhues": "Multi-Color",
+  "violet": "Purple", "voilet": "Purple",
+  "marigold": "Yellow", "turmeric": "Mustard",
+  "lilac": "Lavender", "periwinkle": "Lavender",
+  "mint": "Green", "sage": "Green",
+  "cherry": "Red", "raspberry": "Red",
+  "chocolate": "Brown", "caramel": "Brown",
+  "slate": "Grey", "ash": "Grey",
+  "cobalt": "Blue", "royal": "Blue", "sky": "Blue",
+  "blush": "Pink", "rose": "Pink",
+  "apricot": "Peach",
 };
 
 function snapColor(raw: string): string {
@@ -548,9 +559,9 @@ export async function fillNykaaTemplates(
       ? (snapToMap(vision.sleeveLength, NYKAA_SLEEVE_MAP) || vision.sleeveLength)
       : snapToMap(tagMap["sleeve_length"] || tagMap["sleeve"] || description, NYKAA_SLEEVE_MAP);
 
-    const neckline = vision?.neck
+    const neckline = (vision?.neck
       ? (snapToMap(vision.neck, NYKAA_NECK_MAP) || vision.neck)
-      : snapToMap(tagMap["neck"] || tagMap["neckline"] || description, NYKAA_NECK_MAP);
+      : snapToMap(tagMap["neck"] || tagMap["neckline"] || description, NYKAA_NECK_MAP)) || "Round Neck";
 
     const pattern = snapToMap(
       tagMap["pattern"] || tagMap["print"] || description,
@@ -665,7 +676,9 @@ export async function fillNykaaTemplates(
       const colourFromOption = SIZE_PATTERN.test((variant.option1 ?? "").trim())
         ? (variant.option2 || "")
         : (variant.option1 ?? "");
-      const variantColour = colour || snapColor(colourFromOption);
+      // Don't use colourFromOption if it looks like a size value
+      const safeColourFromOption = SIZE_PATTERN.test(colourFromOption.trim()) ? "" : colourFromOption;
+      const variantColour = colour || snapColor(safeColourFromOption);
 
       const nextRow = (ws.lastRow?.number || 3) + 1;
       const row = ws.getRow(nextRow);
@@ -714,7 +727,9 @@ export async function fillNykaaTemplates(
       if (isDress) {
         set("dress shape", dressShape);
         set("ethnic dresses subcategory", dressSubcategory);
-        if (lengthInches) set("length (inches)", lengthInches);
+        const dressLength = lengthInches || 46; // default Calf Length
+        set("length (inches)", dressLength);
+        set("length for body (inches)", dressLength);
       }
 
       if (isSet) {
