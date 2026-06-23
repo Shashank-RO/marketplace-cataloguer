@@ -694,7 +694,8 @@ export async function fillNykaaTemplates(
       set("style code", van);
       set("product name", product.title);
       set("description", description);
-      set("price", Number(variant.price) || Number(product.variants[0]?.price) || 0);
+      const mrp = Number(variant.compare_at_price) || Number(product.variants[0]?.compare_at_price) || Number(variant.price) || 0;
+      set("price", mrp);
       set("color", variantColour);
       set("country of origin", COUNTRY);
       set("manufacturer name", MANUFACTURER_NAME);
