@@ -125,6 +125,9 @@ const NYKAA_COLOR_MAP: Record<string, string> = {
 };
 
 function snapColor(raw: string): string {
+  if (!raw) return "";
+  // Multi-colour names (e.g. "Orange & Red", "Black/White") → Multi-Color
+  if (raw.includes("&") || raw.includes("/")) return "Multi-Color";
   const lower = raw.toLowerCase();
   // Longest-key-first matching
   const sorted = Object.entries(NYKAA_COLOR_MAP).sort((a, b) => b[0].length - a[0].length);
@@ -429,7 +432,8 @@ function extractArticleNumber(sku: string): string {
 }
 
 function extractColourFromTitle(title: string): string {
-  const m = title.match(/[-–]\s*([A-Za-z][A-Za-z\s]+)$/);
+  // Allow letters, spaces, &, / in colour suffix e.g. "Orange & Red", "Black/White"
+  const m = title.match(/[-–]\s*([A-Za-z][A-Za-z\s&/]+)$/);
   return m ? m[1].trim() : "";
 }
 
@@ -667,7 +671,7 @@ export async function fillNykaaTemplates(
     sheetsUsed.add(sheetName);
 
     // ── Write one row per variant ──
-    const SIZE_PATTERN = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|\d+)$/i;
+    const SIZE_PATTERN = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|\d+)$/i;
 
     for (const variant of product.variants) {
       const size = (variant.option1 ?? "S").toUpperCase();
