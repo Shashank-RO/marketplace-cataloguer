@@ -37,10 +37,10 @@ export async function POST(req: NextRequest) {
 
     if (marketplace === "myntra") {
       let buffer: ExcelJS.Buffer;
-      const now = new Date();
-      const dd = String(now.getDate()).padStart(2, "0");
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const yy = String(now.getFullYear()).slice(-2);
+      const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000); // UTC+5:30 IST
+      const dd = String(now.getUTCDate()).padStart(2, "0");
+      const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+      const yy = String(now.getUTCFullYear()).slice(-2);
       const datePfx = `${dd}${mm}${yy}`;
 
       let filename: string;
