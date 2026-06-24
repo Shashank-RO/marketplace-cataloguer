@@ -330,6 +330,9 @@ export default function Home() {
   const [showExportConfirm, setShowExportConfirm] = useState(false);
   const [exportingNykaa, setExportingNykaa] = useState(false);
   const [showNykaaConfirm, setShowNykaaConfirm] = useState(false);
+  const [missingMrpProducts, setMissingMrpProducts] = useState<{ id: string; title: string; price: string }[]>([]);
+  const [mrpOverrides, setMrpOverrides] = useState<Record<string, string>>({});
+  const [pendingSeason, setPendingSeason] = useState<string>("");
 
   function getCurrentSeason(): string {
     const m = new Date().getMonth() + 1;
@@ -606,6 +609,26 @@ export default function Home() {
 
   const doExportNykaa = async (season: string) => {
     setShowNykaaConfirm(false);
+
+    // Check for products with missing MRP
+    const selectedProducts = products.filter((p) => selected.has(p.id));
+    const missing = selectedProducts
+      .filter((p) => !p.variants.some((v) => v.compare_at_price && Number(v.compare_at_price) > 0))
+      .map((p) => ({ id: p.id, title: p.title, price: p.variants[0]?.price || "" }));
+
+    if (missing.length > 0) {
+      const overrides: Record<string, string> = {};
+      missing.forEach((p) => { overrides[p.id] = ""; });
+      setMissingMrpProducts(missing);
+      setMrpOverrides(overrides);
+      setPendingSeason(season);
+      return;
+    }
+
+    await runNykaaExport(season, {});
+  };
+
+  const runNykaaExport = async (season: string, priceOverrides: Record<string, string>) => {
     const templates: Record<string, string> = {};
     for (const { key } of NYKAA_TEMPLATE_KEYS) {
       templates[key.replace("nykaa_", "")] = localStorage.getItem(key) || "";
@@ -620,6 +643,7 @@ export default function Home() {
           productIds: Array.from(selected),
           season,
           templates,
+          priceOverrides,
         }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Export failed"); }
@@ -730,6 +754,46 @@ export default function Home() {
               >
                 Export
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Missing MRP modal */}
+      {missingMrpProducts.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">MRP Missing</h2>
+            <p className="text-sm text-gray-500 mb-4">The following products have no MRP set. Please enter their MRP before exporting.</p>
+            <div className="overflow-y-auto flex-1 space-y-3 mb-5">
+              {missingMrpProducts.map((p) => (
+                <div key={p.id} className="flex items-center gap-3">
+                  <span className="flex-1 text-sm text-gray-700 truncate" title={p.title}>{p.title}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-gray-400">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={p.price}
+                      value={mrpOverrides[p.id] || ""}
+                      onChange={(e) => setMrpOverrides((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                      className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setMissingMrpProducts([])} className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={() => {
+                  const missing = missingMrpProducts.filter((p) => !mrpOverrides[p.id] || Number(mrpOverrides[p.id]) <= 0);
+                  if (missing.length > 0) { alert(`Please enter MRP for: ${missing.map((p) => p.title).join(", ")}`); return; }
+                  setMissingMrpProducts([]);
+                  runNykaaExport(pendingSeason, mrpOverrides);
+                }}
+                className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-xl text-sm font-medium hover:bg-[#7a1717]"
+              >Export</button>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { getToken, refreshToken } from "@/lib/token-store";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { productIds, season, templates } = body as {
+    const { productIds, season, templates, priceOverrides } = body as {
       productIds: string[];
       season: string;
       templates: {
@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
         dresses: string;
         sets: string;
       };
+      priceOverrides: Record<string, string>;
     };
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
         sets:    toBuffer(templates.sets),
       },
       products,
-      { season },
+      { season, priceOverrides: priceOverrides || {} },
     );
 
     const now = new Date();

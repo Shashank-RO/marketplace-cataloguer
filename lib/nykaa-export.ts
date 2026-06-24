@@ -489,7 +489,7 @@ export async function fillNykaaTemplates(
     sets: Buffer | ArrayBuffer;
   },
   products: ShopifyProduct[],
-  options: { season: string },
+  options: { season: string; priceOverrides?: Record<string, string> },
 ): Promise<{ buffer: Buffer; categories: string[] }> {
   // Load all 4 template workbooks
   const workbooks: Record<NykaaSheet, ExcelJS.Workbook> = {
@@ -550,14 +550,18 @@ export async function fillNykaaTemplates(
     const hsn = extractHSN(fabric);
     const care = extractCare(tagMap, description);
     // Colour: vision dominantColor is already a valid Nykaa value; fall back to keyword-map matching
-    const rawColour = extractColourFromTitle(product.title) || product.variants[0]?.option2 || product.variants[0]?.option1 || "";
+    const sizePattern = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|\d+)$/i;
+    const opt1 = product.variants[0]?.option1 || "";
+    const opt2 = product.variants[0]?.option2 || "";
+    const colourOption = sizePattern.test(opt1.trim()) ? opt2 : opt1;
+    const rawColour = extractColourFromTitle(product.title) || (sizePattern.test(colourOption.trim()) ? "" : colourOption);
     const colour = (vision?.dominantColor && vision.dominantColor.trim()) ? vision.dominantColor.trim() : snapColor(rawColour);
     const van = extractArticleNumber(product.variants[0]?.sku || "");
 
     // Vision-derived attributes
-    const sleeveLength = vision?.sleeveLength
+    const sleeveLength = (vision?.sleeveLength
       ? (snapToMap(vision.sleeveLength, NYKAA_SLEEVE_MAP) || vision.sleeveLength)
-      : snapToMap(tagMap["sleeve_length"] || tagMap["sleeve"] || description, NYKAA_SLEEVE_MAP);
+      : snapToMap(tagMap["sleeve_length"] || tagMap["sleeve"] || description, NYKAA_SLEEVE_MAP)) || "Three Fourth Sleeves";
 
     const neckline = (vision?.neck
       ? (snapToMap(vision.neck, NYKAA_NECK_MAP) || vision.neck)
@@ -694,7 +698,11 @@ export async function fillNykaaTemplates(
       set("style code", van);
       set("product name", product.title);
       set("description", description);
-      const mrp = Number(variant.compare_at_price) || Number(product.variants[0]?.compare_at_price) || Number(variant.price) || 0;
+      const overridePrice = options.priceOverrides?.[product.id];
+      const mrp = (overridePrice ? Number(overridePrice) : 0)
+        || Number(variant.compare_at_price)
+        || Number(product.variants[0]?.compare_at_price)
+        || Number(variant.price) || 0;
       set("price", mrp);
       set("color", variantColour);
       set("country of origin", COUNTRY);
@@ -768,10 +776,11 @@ export async function fillNykaaTemplates(
       set("waist for body (inches)", body.waist);
       if (!isTops) set("hip for body (inches)", body.hip);
       set("shoulder for body (inches)", body.shoulder);
-      if (lengthInches) {
-        set("length (inches)", lengthInches);
-        set("length for body (inches)", lengthInches);
-      }
+      // Default length: Knee Length (42") for kurtis/tops, Calf Length (46") for sets
+      const defaultLength = isSet ? 46 : 42;
+      const finalLength = lengthInches || defaultLength;
+      set("length (inches)", finalLength);
+      set("length for body (inches)", finalLength);
 
       // Images — use Cloudinary fetch URLs (3:4 portrait crop, face gravity)
       const imgSlots = ["front image", "back image", "additional image 1", "additional image 2",
