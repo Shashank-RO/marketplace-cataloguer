@@ -230,12 +230,12 @@ export async function fetchProductsFiltered(
       } as ShopifyProduct;
     })
     .filter((p: ShopifyProduct) => {
-      // SKU filter — prefix match so "ZKP1184BM1903" finds "ZKP1184BM1903-XS" etc.
+      // SKU filter — exact match or {sku}-{size} suffix only
       if (filters.skus.length === 0) return true;
       const variantSkus = p.variants.map((v) => v.sku?.trim().toLowerCase()).filter(Boolean);
       return filters.skus.some((s) => {
         const sl = s.toLowerCase();
-        return variantSkus.some((vs) => vs === sl || vs.startsWith(sl + "-") || vs.startsWith(sl));
+        return variantSkus.some((vs) => vs === sl || vs.startsWith(sl + "-"));
       });
     });
 
