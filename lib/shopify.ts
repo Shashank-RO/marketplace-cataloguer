@@ -110,28 +110,32 @@ export async function fetchProductsFiltered(
   const t = token || process.env.SHOPIFY_ADMIN_TOKEN;
   if (!domain || !t) throw new Error("Shopify env vars not set");
 
+  // Strip characters that would break out of the GraphQL string literal or the
+  // Shopify search syntax (quotes, backslashes, parens, extra colons)
+  const clean = (s: string) => s.replace(/["\\():]/g, "").trim();
+
   // Build Shopify query string
   const parts: string[] = [];
 
   if (filters.collections.length > 0) {
-    const orPart = filters.collections.map((c) => `tag:${c}`).join(" OR ");
+    const orPart = filters.collections.map((c) => `tag:${clean(c)}`).join(" OR ");
     parts.push(filters.collections.length > 1 ? `(${orPart})` : orPart);
   }
   for (const tag of filters.tags) {
-    parts.push(`tag:${tag}`);
+    parts.push(`tag:${clean(tag)}`);
   }
   if (filters.productType) {
-    parts.push(`product_type:${filters.productType}`);
+    parts.push(`product_type:${clean(filters.productType)}`);
   }
   // SKU search: use Shopify sku: query so we search the whole catalogue, not just first page
   if (filters.skus.length > 0) {
-    const skuPart = filters.skus.map((s) => `sku:${s}*`).join(" OR ");
+    const skuPart = filters.skus.map((s) => `sku:${clean(s)}*`).join(" OR ");
     parts.push(filters.skus.length > 1 ? `(${skuPart})` : skuPart);
   }
 
   const queryString = parts.join(" AND ");
 
-  const afterClause = filters.cursor ? `, after: "${filters.cursor}"` : "";
+  const afterClause = filters.cursor ? `, after: "${clean(filters.cursor)}"` : "";
 
   const graphqlQuery = `{
     products(first: 50, query: "${queryString}"${afterClause}, sortKey: CREATED_AT, reverse: true) {

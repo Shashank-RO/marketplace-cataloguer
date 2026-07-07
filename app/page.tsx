@@ -392,7 +392,7 @@ export default function Home() {
       }
       const url = `/api/products${params.toString() ? `?${params}` : ""}`;
       const res = await fetch(url);
-      if (res.status === 401) { window.location.href = "/api/auth"; return; }
+      if (res.status === 401) { window.location.href = "/login"; return; }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setProducts(data.products);

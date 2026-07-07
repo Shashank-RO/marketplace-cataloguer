@@ -1,6 +1,6 @@
 // In-memory token store with auto-refresh via client credentials
-let cachedToken: string | null = process.env.SHOPIFY_ADMIN_TOKEN || null;
-let tokenExpiry: number = Date.now() + 82800000; // 23 hours default
+let cachedToken: string | null = null;
+let tokenExpiry = 0;
 
 export async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < tokenExpiry) {
@@ -24,7 +24,12 @@ export async function refreshToken(): Promise<string> {
     }),
   });
 
-  if (!res.ok) throw new Error(`Token refresh failed: ${res.status}`);
+  if (!res.ok) {
+    // Fall back to a static admin token if client-credentials refresh fails
+    const fallback = process.env.SHOPIFY_ADMIN_TOKEN;
+    if (fallback) return fallback;
+    throw new Error(`Token refresh failed: ${res.status}`);
+  }
 
   const data = await res.json();
   cachedToken = data.access_token;
