@@ -1002,16 +1002,23 @@ function getValue(
 
   // ── Garment attributes ──
   if (hl === "occasion") {
-    const vOccasion = vision?.occasion ? (snapToMap(vision.occasion, OCCASION_MAP) || vision.occasion) : "";
+    const at = articleType.toLowerCase();
+    const allowsCasual = at.includes("tunic") || at.includes("top") || at.includes("co-ord") || at.includes("coord");
+    // Vision returns "Casual"; on sheets whose dropdown has no "Daily" this must stay "Casual", not snap to "Daily"
+    if (vision?.occasion?.toLowerCase().includes("casual") && allowsCasual) return "Casual";
+    const vOccasion = vision?.occasion ? (snapToMap(vision.occasion, OCCASION_MAP) || "") : "";
     return vOccasion || extractOccasion(tagMap, articleType);
   }
   if (hl === "print or pattern type") {
     const motif = extractPrintMotif(tagMap, description);
     // Vision pattern values (Floral, Geometric etc.) are already valid motif values; snap "Printed"→Floral
-    const visionMotif = vision?.pattern ? (snapToMap(vision.pattern, PRINT_MOTIF_MAP) || vision.pattern) : "";
+    const visionMotif = vision?.pattern ? (snapToMap(vision.pattern, PRINT_MOTIF_MAP) || "") : "";
     return visionMotif || motif;
   }
-  if (hl === "pattern") return withVision(vision?.pattern, () => extractPattern(tagMap, description));
+  if (hl === "pattern") {
+    const visionPattern = vision?.pattern ? snapToMap(vision.pattern, PATTERN_MAP) : "";
+    return visionPattern || extractPattern(tagMap, description);
+  }
   if (hl === "fabric") {
     const isDress = articleType.toLowerCase().includes("dress");
     return extractFabric(tagMap, description, false, isDress, product.title);
@@ -1030,10 +1037,13 @@ function getValue(
   }
   if (hl === "knit or woven") return tagMap["knit_or_woven"] || tagMap["fabric_type"] || "";
   if (hl === "sleeve length") {
-    const vSleeve = vision?.sleeveLength ? (snapToMap(vision.sleeveLength, SLEEVE_LENGTH_MAP) || vision.sleeveLength) : "";
+    const vSleeve = vision?.sleeveLength ? snapToMap(vision.sleeveLength, SLEEVE_LENGTH_MAP) : "";
     return vSleeve || extractSleeveLength(tagMap, description);
   }
-  if (hl === "sleeve styling") return withVision(vision?.sleeveStyling, () => extractSleeveStyling(tagMap, description));
+  if (hl === "sleeve styling") {
+    const vStyling = vision?.sleeveStyling ? snapToMap(vision.sleeveStyling, SLEEVE_STYLING_MAP) : "";
+    return vStyling || extractSleeveStyling(tagMap, description);
+  }
   if (hl === "neck") {
     const rawNeck = withTextFirst(() => extractNeck(tagMap, description, product.title), vision?.neck);
     const neckVal = snapToMap(rawNeck, NECK_MAP) || rawNeck;
@@ -1041,29 +1051,38 @@ function getValue(
   }
   if (hl === "shape") {
     const isDress = articleType.toLowerCase().includes("dress");
-    if (isDress) return withVision(vision?.shape, () => snapToMap(tagMap["shape"] || tagMap["silhouette"] || description, DRESS_SHAPE_MAP));
-    return withVision(vision?.shape, () => extractShape(tagMap, description));
+    const shapeMap = isDress ? DRESS_SHAPE_MAP : SHAPE_MAP;
+    const vShape = vision?.shape ? snapToMap(vision.shape, shapeMap) : "";
+    if (vShape) return vShape;
+    return isDress
+      ? snapToMap(tagMap["shape"] || tagMap["silhouette"] || description, DRESS_SHAPE_MAP)
+      : extractShape(tagMap, description);
   }
   if (hl === "length") {
     const isDress = articleType.toLowerCase().includes("dress");
     if (isDress) {
+      const vLength = vision?.length ? snapToMap(vision.length, DRESS_LENGTH_MAP) : "";
+      if (vLength) return vLength;
       const allText = tagMap["length"] || tagMap["garment_length"] || "";
-      return withVision(vision?.length, () => snapToMap(allText || lengthText, DRESS_LENGTH_MAP));
+      return snapToMap(allText || lengthText, DRESS_LENGTH_MAP);
     }
     // Kurtas/Tunics: vision is most accurate; text fallback only if explicit length tag exists
+    const vLength = vision?.length ? snapToMap(vision.length, LENGTH_MAP) : "";
+    if (vLength) return vLength;
     const explicitLength = tagMap["length"] || tagMap["garment_length"] || "";
-    return vision?.length || (explicitLength ? snapToMap(explicitLength, LENGTH_MAP) : "");
+    return explicitLength ? snapToMap(explicitLength, LENGTH_MAP) : "";
   }
   if (hl === "hemline") {
     const isDress = articleType.toLowerCase().includes("dress");
     const hMap = isDress ? DRESS_HEMLINE_MAP : HEMLINE_MAP;
-    return withVision(vision?.hemline, () => snapToMap(tagMap["hemline"] || "", hMap));
+    const vHemline = vision?.hemline ? snapToMap(vision.hemline, hMap) : "";
+    return vHemline || snapToMap(tagMap["hemline"] || "", hMap);
   }
   if (hl === "slit detail") return tagMap["slit_detail"] || tagMap["slit"] || "";
   if (hl === "ornamentation") return tagMap["ornamentation"] || "";
   if (hl === "technique") return tagMap["technique"] || "";
-  if (hl === "weave pattern") return tagMap["weave_pattern"] || "";
-  if (hl === "weave type") return tagMap["weave_type"] || "";
+  if (hl === "weave pattern") return tagMap["weave_pattern"] || "Regular";
+  if (hl === "weave type") return tagMap["weave_type"] || "Machine Weave";
   if (hl === "design styling") {
     const vDesign = vision?.designStyling ? (snapToMap(vision.designStyling, DESIGN_STYLING_MAP) || "") : "";
     return vDesign || snapToMap(tagMap["design_styling"] || description, DESIGN_STYLING_MAP);
@@ -1096,15 +1115,21 @@ function getValue(
   if (hl === "bottom fabric") return normaliseFabric(tagMap["bottom_fabric"] || "", true) || extractFabric(tagMap, description, true, false, product.title);
   if (hl === "top type") {
     const isCoOrd = articleType.toLowerCase().includes("co-ord") || articleType.toLowerCase().includes("coord");
-    const TOP_TYPE_MAP: Record<string, string> = { "kurta": "Kurta", "kurti": "Kurti", "top": "Top" };
-    const raw = vision?.topType || (isCoOrd ? "Top" : "Kurta");
-    return snapToMap(raw, TOP_TYPE_MAP) || (isCoOrd ? "Top" : "Kurta");
+    // Co-Ords dropdown has no Kurta/Kurti — a kurta-style top there is closest to "Tunic"
+    const TOP_TYPE_MAP: Record<string, string> = isCoOrd
+      ? { "kurta": "Tunic", "kurti": "Tunic", "tunic": "Tunic", "top": "Top", "shirt": "Shirt" }
+      : { "kurta": "Kurta", "kurti": "Kurti", "top": "Top" };
+    const defaultVal = isCoOrd ? "Top" : "Kurta";
+    const raw = vision?.topType || defaultVal;
+    return snapToMap(raw, TOP_TYPE_MAP) || defaultVal;
   }
   if (hl === "bottom type") {
     const isCoOrd = articleType.toLowerCase().includes("co-ord") || articleType.toLowerCase().includes("coord");
-    const raw = tagMap["bottom_type"] || description;
     const map = isCoOrd ? BOTTOM_TYPE_MAP_COORDS : BOTTOM_TYPE_MAP_SETS;
-    return withVision(vision?.bottomType, () => snapToMap(raw, map) || (isCoOrd ? "Trousers" : "Trousers"));
+    const vBottom = vision?.bottomType ? snapToMap(vision.bottomType, map) : "";
+    if (vBottom) return vBottom;
+    const raw = tagMap["bottom_type"] || description;
+    return snapToMap(raw, map) || "Trousers";
   }
   if (hl === "top pattern") {
     // Valid: Printed | Embroidered | Solid | Dyed | Self Design | Yoke Design | Striped | Colourblocked | Woven Design | Checked
@@ -1126,7 +1151,12 @@ function getValue(
   if (hl === "top closure") return "";
   if (hl === "top hemline") return tagMap["top_hemline"] || "Flared";
   if (hl === "bottom hemline") return tagMap["bottom_hemline"] || "";
-  if (hl === "top design styling") return withVision(vision?.designStyling, () => "Regular");
+  if (hl === "top design styling") {
+    // Design styling is a construction term (Angrakha/Empire/Regular/...), not a print/pattern word —
+    // vision's designStyling sometimes returns pattern-ish values ("Printed"), which snap to nothing here
+    const vDesign = vision?.designStyling ? snapToMap(vision.designStyling, DESIGN_STYLING_MAP) : "";
+    return vDesign || snapToMap(tagMap["design_styling"] || description, DESIGN_STYLING_MAP) || "Regular";
+  }
   // Top length (Kurta Sets): physical length of the kurta top only (not the bottom/palazzo)
   if (hl === "top length") {
     const TOP_LENGTH_MAP: Record<string, string> = {
@@ -1137,7 +1167,10 @@ function getValue(
     };
     return snapToMap(vision?.topLength || vision?.length || "", TOP_LENGTH_MAP) || "";
   }
-  if (hl === "top shape") return withVision(vision?.shape, () => extractShape(tagMap, description));
+  if (hl === "top shape") {
+    const vShape = vision?.shape ? snapToMap(vision.shape, SHAPE_MAP) : "";
+    return vShape || extractShape(tagMap, description);
+  }
   if (hl === "waistband") return "Elasticated";
   if (hl === "pattern coverage") {
     const fromTag = snapToMap(tagMap["pattern_coverage"] || "", { "yoke": "Yoke or Border", "border": "Yoke or Border", "placement": "Placement", "small": "Small", "large": "Large", "none": "None" });
