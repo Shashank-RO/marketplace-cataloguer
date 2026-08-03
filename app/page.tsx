@@ -335,6 +335,9 @@ export default function Home() {
   const [missingMrpProducts, setMissingMrpProducts] = useState<{ id: string; title: string; price: string }[]>([]);
   const [mrpOverrides, setMrpOverrides] = useState<Record<string, string>>({});
   const [pendingSeason, setPendingSeason] = useState<string>("");
+  // Shown when the Anthropic account runs out of credits mid-export; retry() re-runs
+  // the same export with skipVision:true (tag/description fallbacks only, no AI analysis)
+  const [creditsModal, setCreditsModal] = useState<{ retry: () => void } | null>(null);
 
   function getCurrentSeason(): string {
     const m = new Date().getMonth() + 1;
@@ -565,7 +568,7 @@ export default function Home() {
     setShowExportConfirm(true);
   };
 
-  const doExport = async (year: string, season: string) => {
+  const doExport = async (year: string, season: string, skipVision = false) => {
     setShowExportConfirm(false);
 
     let templateDataUrl: string | undefined;
@@ -584,10 +587,18 @@ export default function Home() {
           marketplace: "myntra",
           year,
           season,
+          skipVision,
           ...(templateDataUrl ? { templateDataUrl } : {}),
         }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Export failed"); }
+      if (!res.ok) {
+        const d = await res.json();
+        if (d.code === "insufficient_credits") {
+          setCreditsModal({ retry: () => doExport(year, season, true) });
+          return;
+        }
+        throw new Error(d.error || "Export failed");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -634,7 +645,7 @@ export default function Home() {
     await runNykaaExport(season, {});
   };
 
-  const runNykaaExport = async (season: string, priceOverrides: Record<string, string>) => {
+  const runNykaaExport = async (season: string, priceOverrides: Record<string, string>, skipVision = false) => {
     const templates: Record<string, string> = {};
     for (const { key } of NYKAA_TEMPLATE_KEYS) {
       templates[key.replace("nykaa_", "")] = localStorage.getItem(key) || "";
@@ -650,9 +661,17 @@ export default function Home() {
           season,
           templates,
           priceOverrides,
+          skipVision,
         }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Export failed"); }
+      if (!res.ok) {
+        const d = await res.json();
+        if (d.code === "insufficient_credits") {
+          setCreditsModal({ retry: () => runNykaaExport(season, priceOverrides, true) });
+          return;
+        }
+        throw new Error(d.error || "Export failed");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -800,6 +819,40 @@ export default function Home() {
                 }}
                 className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-xl text-sm font-medium hover:bg-[#7a1717]"
               >Export</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI credits exhausted mid-export */}
+      {creditsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">AI Credits Exhausted</h2>
+            <p className="text-sm text-gray-500 mb-5">
+              The Anthropic account has run out of credits, so image analysis (colour, fit,
+              length, neckline, etc.) can&apos;t continue for the remaining products. You can wait
+              for the balance to recharge and export later, or proceed now — the export will
+              still complete, but attributes will fall back to tag/description-based values
+              instead of AI-analysed ones.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCreditsModal(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Wait for recharge
+              </button>
+              <button
+                onClick={() => {
+                  const retry = creditsModal.retry;
+                  setCreditsModal(null);
+                  retry();
+                }}
+                className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800"
+              >
+                Proceed Anyway
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { analyzeProductImage } from "./vision";
+import { runVisionBatch } from "./vision";
 import type { ShopifyProduct } from "./shopify";
 import { cloudinaryFetchUrl } from "./cloudinary";
 
@@ -493,7 +493,7 @@ export async function fillNykaaTemplates(
     sets: Buffer | ArrayBuffer;
   },
   products: ShopifyProduct[],
-  options: { season: string; priceOverrides?: Record<string, string> },
+  options: { season: string; priceOverrides?: Record<string, string>; skipVision?: boolean },
 ): Promise<{ buffer: Buffer; categories: string[] }> {
   // Load all 4 template workbooks
   const workbooks: Record<NykaaSheet, ExcelJS.Workbook> = {
@@ -524,23 +524,15 @@ export async function fillNykaaTemplates(
     designCodeMap.set(p.id, baseNameToDesignCode.get(baseName)!);
   }
 
-  // Pre-fetch all vision calls in parallel (with 15s timeout per product)
-  const visionMap = new Map<string, Awaited<ReturnType<typeof analyzeProductImage>>>();
-  await Promise.all(products.map(async (product) => {
-    const firstImage = product.images[0]?.src
+  // Pre-fetch all vision calls in parallel (with 15s timeout per product);
+  // throws InsufficientCreditsError if the Anthropic account runs dry
+  const visionMap = await runVisionBatch(
+    products,
+    (product) => product.images[0]?.src
       .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")
-      .replace(/\.png(\?.*)?$/i, ".jpg$1") || "";
-    if (!firstImage) { visionMap.set(product.id, null); return; }
-    try {
-      const result = await Promise.race([
-        analyzeProductImage(firstImage),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
-      ]);
-      visionMap.set(product.id, result);
-    } catch {
-      visionMap.set(product.id, null);
-    }
-  }));
+      .replace(/\.png(\?.*)?$/i, ".jpg$1") || "",
+    options.skipVision,
+  );
 
   for (const product of products) {
     const sheetName = getSheetForProductType(product.product_type || "");

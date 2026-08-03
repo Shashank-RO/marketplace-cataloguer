@@ -17,6 +17,21 @@ export interface VisionAttributes {
   dominantColor: string;
 }
 
+/** Thrown when the Anthropic account has run out of credits — distinct from
+ * transient/network failures so callers can stop burning further requests
+ * and surface a clear choice to the user instead of silently degrading. */
+export class InsufficientCreditsError extends Error {
+  constructor(message = "Anthropic API credit balance is too low") {
+    super(message);
+    this.name = "InsufficientCreditsError";
+  }
+}
+
+function isInsufficientCreditsError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /credit balance/i.test(msg);
+}
+
 let _client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!_client) {
@@ -90,7 +105,47 @@ export async function analyzeProductImage(imageUrl: string): Promise<VisionAttri
     visionCache.set(imageUrl, attrs);
     return attrs;
   } catch (e) {
+    if (isInsufficientCreditsError(e)) throw new InsufficientCreditsError();
     console.error("[vision] analyzeProductImage error:", e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+/**
+ * Runs analyzeProductImage over a batch of items in parallel (15s timeout each).
+ * If any call fails due to insufficient Anthropic credits, remaining/in-flight
+ * items are skipped (returned as null) and InsufficientCreditsError is thrown
+ * once the batch settles — callers should stop the export rather than
+ * silently continuing with partial AI data.
+ */
+export async function runVisionBatch<T extends { id: string }>(
+  items: T[],
+  getImageUrl: (item: T) => string,
+  skipVision = false,
+): Promise<Map<string, VisionAttributes | null>> {
+  const visionMap = new Map<string, VisionAttributes | null>();
+  if (skipVision) {
+    items.forEach((item) => visionMap.set(item.id, null));
+    return visionMap;
+  }
+
+  let creditsExhausted = false;
+  await Promise.all(items.map(async (item) => {
+    if (creditsExhausted) { visionMap.set(item.id, null); return; }
+    const imageUrl = getImageUrl(item);
+    if (!imageUrl) { visionMap.set(item.id, null); return; }
+    try {
+      const result = await Promise.race([
+        analyzeProductImage(imageUrl),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+      ]);
+      visionMap.set(item.id, result);
+    } catch (e) {
+      if (e instanceof InsufficientCreditsError) creditsExhausted = true;
+      visionMap.set(item.id, null);
+    }
+  }));
+
+  if (creditsExhausted) throw new InsufficientCreditsError();
+  return visionMap;
 }

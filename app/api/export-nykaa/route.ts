@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchProduct } from "@/lib/shopify";
 import { fillNykaaTemplates } from "@/lib/nykaa-export";
 import { getToken, refreshToken } from "@/lib/token-store";
+import { InsufficientCreditsError } from "@/lib/vision";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { productIds, season, templates, priceOverrides } = body as {
+    const { productIds, season, templates, priceOverrides, skipVision } = body as {
       productIds: string[];
       season: string;
       templates: {
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
         sets: string;
       };
       priceOverrides: Record<string, string>;
+      skipVision?: boolean;
     };
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
         sets:    toBuffer(templates.sets),
       },
       products,
-      { season, priceOverrides: priceOverrides || {} },
+      { season, priceOverrides: priceOverrides || {}, skipVision },
     );
 
     const now = new Date(Date.now() + 5.5 * 60 * 60 * 1000); // UTC+5:30 IST
@@ -68,6 +70,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: unknown) {
+    if (e instanceof InsufficientCreditsError) {
+      return NextResponse.json({ error: e.message, code: "insufficient_credits" }, { status: 402 });
+    }
     const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }

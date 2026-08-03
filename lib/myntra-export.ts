@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { ShopifyProduct } from "./shopify";
-import { analyzeProductImage, VisionAttributes } from "./vision";
+import { runVisionBatch, VisionAttributes } from "./vision";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1345,7 +1345,7 @@ export async function fillMyntraTemplate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templateBuffer: any,
   products: ShopifyProduct[],
-  meta: { year?: string; season?: string } = {},
+  meta: { year?: string; season?: string; skipVision?: boolean } = {},
 ): Promise<ExcelJS.Buffer> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(templateBuffer);
@@ -1428,22 +1428,14 @@ export async function fillMyntraTemplate(
       colorGroupMap.set(p.id, baseNameToGroupId.get(baseName)!);
     }
 
-    // Pre-fetch all vision calls in parallel (with 8s timeout per product)
-    const visionMap = new Map<string, VisionAttributes | null>();
-    await Promise.all(sheetProducts.map(async (product) => {
-      const primaryImageUrl = product.images[0]?.src
-        .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (_, ext) => ext || "") || "";
-      if (!primaryImageUrl) { visionMap.set(product.id, null); return; }
-      try {
-        const result = await Promise.race([
-          analyzeProductImage(primaryImageUrl),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
-        ]);
-        visionMap.set(product.id, result);
-      } catch {
-        visionMap.set(product.id, null);
-      }
-    }));
+    // Pre-fetch all vision calls in parallel (with 15s timeout per product);
+    // throws InsufficientCreditsError if the Anthropic account runs dry
+    const visionMap = await runVisionBatch(
+      sheetProducts,
+      (product) => product.images[0]?.src
+        .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (_, ext) => ext || "") || "",
+      meta.skipVision,
+    );
 
     let styleGroupId = 1;
     for (const product of sheetProducts) {

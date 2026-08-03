@@ -3,16 +3,18 @@ import { fetchProduct } from "@/lib/shopify";
 import { buildMyntraWorkbook } from "@/lib/myntra-template";
 import { fillMyntraTemplate } from "@/lib/myntra-export";
 import { getToken, refreshToken } from "@/lib/token-store";
+import { InsufficientCreditsError } from "@/lib/vision";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { productIds, marketplace, templateDataUrl, year, season } = body as {
+    const { productIds, marketplace, templateDataUrl, year, season, skipVision } = body as {
       productIds: string[];
       marketplace: string;
       templateDataUrl?: string;
       year?: string;
       season?: string;
+      skipVision?: boolean;
     };
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
         // Template-based export: fill the uploaded combined Myntra format
         const base64 = templateDataUrl.replace(/^data:[^;]+;base64,/, "");
         const templateBuffer = Buffer.from(base64, "base64");
-        buffer = await fillMyntraTemplate(templateBuffer, products, { year, season });
+        buffer = await fillMyntraTemplate(templateBuffer, products, { year, season, skipVision });
         filename = `${datePfx} Myntra-${Date.now()}.xlsx`;
       } else {
         // Fallback: build a simple workbook (no template uploaded)
@@ -67,6 +69,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Unsupported marketplace" }, { status: 400 });
   } catch (e: unknown) {
+    if (e instanceof InsufficientCreditsError) {
+      return NextResponse.json({ error: e.message, code: "insufficient_credits" }, { status: 402 });
+    }
     const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
