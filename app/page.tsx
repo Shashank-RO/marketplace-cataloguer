@@ -325,6 +325,8 @@ export default function Home() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
   const [pageIndex, setPageIndex] = useState(0);
+  // Guards against out-of-order responses: only the most recently-issued request may update state
+  const requestSeqRef = useRef(0);
   const [showFormats, setShowFormats] = useState(false);
   const [exportError, setExportError] = useState<{ missingTypes: { shopify: string; myntra: string }[] } | null>(null);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
@@ -379,6 +381,7 @@ export default function Home() {
     c: string | null,
     filters?: { collections: string[]; tags: string[]; skus: string[]; type: string },
   ) => {
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -395,12 +398,15 @@ export default function Home() {
       if (res.status === 401) { window.location.href = "/login"; return; }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
+      // A newer request has since been issued — this response is stale, discard it
+      if (seq !== requestSeqRef.current) return;
       setProducts(data.products);
       setNextCursor(data.nextCursor);
     } catch (e: unknown) {
+      if (seq !== requestSeqRef.current) return;
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   }, []);
 
