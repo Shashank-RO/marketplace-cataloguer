@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
         tops: string;
         dresses: string;
         sets: string;
+        trousers: string;
       };
       priceOverrides: Record<string, string>;
       skipVision?: boolean;
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json({ error: "No products selected" }, { status: 400 });
     }
-    if (!templates?.kurtis || !templates?.tops || !templates?.dresses || !templates?.sets) {
+    if (!templates?.kurtis || !templates?.tops || !templates?.dresses || !templates?.sets || !templates?.trousers) {
       return NextResponse.json({ error: "Nykaa templates not uploaded. Please upload them via Marketplace Base Formats." }, { status: 400 });
     }
 
@@ -47,10 +48,11 @@ export async function POST(req: NextRequest) {
 
     const { buffer: zipBuffer, categories } = await fillNykaaTemplates(
       {
-        kurtis:  toBuffer(templates.kurtis),
-        tops:    toBuffer(templates.tops),
-        dresses: toBuffer(templates.dresses),
-        sets:    toBuffer(templates.sets),
+        kurtis:   toBuffer(templates.kurtis),
+        tops:     toBuffer(templates.tops),
+        dresses:  toBuffer(templates.dresses),
+        sets:     toBuffer(templates.sets),
+        trousers: toBuffer(templates.trousers),
       },
       products,
       { season, priceOverrides: priceOverrides || {}, skipVision },

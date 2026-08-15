@@ -6,10 +6,11 @@ import { findMatchingSheet } from "@/lib/myntra-export";
 
 // ─── Nykaa template keys stored in localStorage ──────────────────────────────
 const NYKAA_TEMPLATE_KEYS = [
-  { key: "nykaa_kurtis",  label: "Kurtis & Kurtas" },
-  { key: "nykaa_tops",    label: "Tops" },
-  { key: "nykaa_dresses", label: "Ethnic Dresses" },
-  { key: "nykaa_sets",    label: "Salwar Suits & Sets" },
+  { key: "nykaa_kurtis",   label: "Kurtis & Kurtas" },
+  { key: "nykaa_tops",     label: "Tops" },
+  { key: "nykaa_dresses",  label: "Ethnic Dresses" },
+  { key: "nykaa_sets",     label: "Salwar Suits & Sets" },
+  { key: "nykaa_trousers", label: "Trousers" },
 ] as const;
 
 // ─── Myntra Formats Modal ────────────────────────────────────────────────────

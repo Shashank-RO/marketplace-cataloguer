@@ -383,7 +383,93 @@ const NYKAA_LEG_STYLE_MAP: Record<string, string> = {
   "boot cut": "Boot Cut", "bootcut": "Boot Cut",
   "cropped": "Cropped",
   "slim": "Slim",
+  "boyfriend": "Boyfriend",
 };
+
+// Trousers-specific maps — the Trousers dropdown vocabulary (garment-cut terms
+// like Tapered/Skinny/Boyfriend/Bootcut) differs enough from the kurta-oriented
+// NYKAA_FIT_MAP/NYKAA_CLOSURE_MAP that reusing those would under-match
+const TROUSERS_FIT_MAP: Record<string, string> = {
+  "super skinny": "Super Skinny",
+  "super slim": "Super Slim",
+  "skinny": "Skinny",
+  "slim": "Slim",
+  "boyfriend": "Boyfriend",
+  "boot cut": "Bootcut", "bootcut": "Bootcut",
+  "tapered": "Tapered",
+  "tailored": "Tailored",
+  "straight": "Straight",
+  "fit and flare": "Flared", // closest trouser-domain analogue
+  "flared": "Flared",
+  "regular": "Regular",
+  "relaxed": "Relaxed",
+  "loose": "Loose",
+  "oversized": "Oversized",
+  "anti-fit": "Anti-Fit", "anti fit": "Anti-Fit",
+  "asymmetrical": "Asymmetrical", "asymmetric": "Asymmetrical",
+  "wide": "Wide",
+  "mom": "Mom",
+  "boxy": "Boxy",
+  "fitted": "Fitted",
+  "a-line": "A-Line", "a line": "A-Line",
+  "bodycon": "Bodycon",
+  "shift": "Straight", // closest trouser-domain analogue
+  "wrap": "Wrap",
+  "peplum": "Peplum",
+  "empire": "Empire",
+  "gathered": "Gathered",
+  "comfortable": "Comfortable",
+  "tie-up": "Tie-Ups", "tie up": "Tie-Ups", "tie ups": "Tie-Ups",
+};
+
+const TROUSERS_CLOSURE_MAP: Record<string, string> = {
+  "drawstring": "Drawstring",
+  "elastic": "Elastic",
+  "pull on": "Pull On", "pull-on": "Pull On",
+  "button fly": "Button Fly",
+  "zip fly": "Zipper", "zipper": "Zipper", "zip": "Zipper",
+  "hook and eye": "Hook and Eye", "hook & eye": "Hook and Eye",
+  "snap button": "Snap Button", "snap": "Snap Button",
+  "tie-up": "Tie-Ups", "tie up": "Tie-Ups", "tie ups": "Tie-Ups",
+  "velcro": "Velcro",
+  "buckle": "Buckle",
+  "button": "Button",
+  "none": "None",
+};
+
+const TROUSERS_RISE_MAP: Record<string, string> = {
+  "high waist": "High Waist", "high-waist": "High Waist", "high rise": "High Waist",
+  "low waist": "Low Waist", "low-waist": "Low Waist", "low rise": "Low Waist",
+  "mid waist": "Mid Waist", "mid-waist": "Mid Waist", "mid rise": "Mid Waist", "regular waist": "Mid Waist",
+};
+
+const TROUSERS_POCKET_MAP: Record<string, string> = {
+  "slit pocket": "Slit Pocket", "slit": "Slit Pocket",
+  "front pocket": "Front Pocket",
+  "utility": "Utility Pocket",
+  "back pocket": "Only Back Pocket",
+  "5 pocket": "Basic 5 Pocket", "five pocket": "Basic 5 Pocket",
+  "cargo": "Cargo",
+  "4 pocket": "Basic 4 Pocket", "four pocket": "Basic 4 Pocket",
+  "slant": "Slant Pocket",
+};
+
+// Approximate standard women's trouser measurements by size (inches) —
+// same precision level as the existing flat inseam=27 used for Sets bottoms
+const INSEAM_CHART: Record<string, number> = {
+  XS: 26, S: 26.5, M: 27, L: 27.5, XL: 28, XXL: 28.5,
+  "3XL": 29, "4XL": 29, "5XL": 29.5, "6XL": 29.5,
+};
+const BOTTOM_LENGTH_CHART: Record<string, number> = {
+  XS: 38, S: 38.5, M: 39, L: 39.5, XL: 40, XXL: 40.5,
+  "3XL": 41, "4XL": 41, "5XL": 41.5, "6XL": 41.5,
+};
+
+/** HSN for Trousers — distinct from the kurta/dress default: 62046200 for cotton
+ * (most common), 62046900 for other textile materials */
+function extractTrouserHSN(fabric: string): string {
+  return fabric.toLowerCase().includes("cotton") ? "62046200" : "62046900";
+}
 
 const NYKAA_TOPWEAR_LENGTH_MAP: Record<string, string> = {
   "crop": "Crop",
@@ -450,7 +536,7 @@ function lengthCategoryToInches(cat: string): number | null {
 
 // ─── Sheet routing ────────────────────────────────────────────────────────────
 
-type NykaaSheet = "Kurtis and Kurtas" | "Ethnic Dresses" | "Salwar Suits Sets Women Girls" | "Tops";
+type NykaaSheet = "Kurtis and Kurtas" | "Ethnic Dresses" | "Salwar Suits Sets Women Girls" | "Tops" | "Trousers";
 
 function getSheetForProductType(productType: string): NykaaSheet | null {
   const pt = productType.toLowerCase().trim();
@@ -463,6 +549,7 @@ function getSheetForProductType(productType: string): NykaaSheet | null {
   }
   if (pt.includes("dress")) return "Ethnic Dresses";
   if (pt === "tops" || pt === "top" || pt === "tunic" || pt === "tunics") return "Tops";
+  if (pt.includes("trouser") || pt.includes("pant")) return "Trousers";
   return null;
 }
 
@@ -480,6 +567,7 @@ function getPackContains(productType: string): string {
   if (pt.includes("set") || pt.includes("co-ord") || pt.includes("coord")) return "1 Kurta 1 Pant";
   if (pt.includes("dress")) return "1 Dress";
   if (pt === "tops" || pt === "top" || pt.includes("tunic")) return "1 Top";
+  if (pt.includes("trouser") || pt.includes("pant")) return "1 Trouser";
   return "1 Kurta";
 }
 
@@ -491,16 +579,18 @@ export async function fillNykaaTemplates(
     tops: Buffer | ArrayBuffer;
     dresses: Buffer | ArrayBuffer;
     sets: Buffer | ArrayBuffer;
+    trousers: Buffer | ArrayBuffer;
   },
   products: ShopifyProduct[],
   options: { season: string; priceOverrides?: Record<string, string>; skipVision?: boolean },
 ): Promise<{ buffer: Buffer; categories: string[] }> {
-  // Load all 4 template workbooks
+  // Load all 5 template workbooks
   const workbooks: Record<NykaaSheet, ExcelJS.Workbook> = {
     "Kurtis and Kurtas":            new ExcelJS.Workbook(),
     "Tops":                         new ExcelJS.Workbook(),
     "Ethnic Dresses":               new ExcelJS.Workbook(),
     "Salwar Suits Sets Women Girls": new ExcelJS.Workbook(),
+    "Trousers":                     new ExcelJS.Workbook(),
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -509,6 +599,7 @@ export async function fillNykaaTemplates(
   await loadBuf(workbooks["Tops"], templateBuffers.tops);
   await loadBuf(workbooks["Ethnic Dresses"], templateBuffers.dresses);
   await loadBuf(workbooks["Salwar Suits Sets Women Girls"], templateBuffers.sets);
+  await loadBuf(workbooks["Trousers"], templateBuffers.trousers);
 
   // Track which sheets got data
   const sheetsUsed = new Set<NykaaSheet>();
@@ -561,7 +652,7 @@ export async function fillNykaaTemplates(
     const vision = visionMap.get(product.id) ?? null;
 
     const fabric = extractFabric(tagMap, description, product.title);
-    const hsn = extractHSN(fabric);
+    const hsn = sheetName === "Trousers" ? extractTrouserHSN(fabric) : extractHSN(fabric);
     const care = extractCare(tagMap, description);
     // Colour: vision dominantColor is already a valid Nykaa value; fall back to keyword-map matching
     const sizePattern = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|\d+)$/i;
@@ -595,16 +686,24 @@ export async function fillNykaaTemplates(
     const isSet = sheetName === "Salwar Suits Sets Women Girls";
     const isDress = sheetName === "Ethnic Dresses";
     const isTops = sheetName === "Tops";
+    const isTrousers = sheetName === "Trousers";
 
+    // Trousers uses its own fit/closure vocabulary (Tapered/Skinny/Boyfriend/Drawstring etc.)
+    // rather than the kurta-oriented shared maps
+    const fitMap = isTrousers ? TROUSERS_FIT_MAP : NYKAA_FIT_MAP;
     const fit = snapToMap(
       tagMap["fit"] || tagMap["silhouette"] || tagMap["shape"] || "",
-      NYKAA_FIT_MAP,
-    ) || ((!isSet && vision?.shape) ? (snapToMap(vision.shape, NYKAA_FIT_MAP) || "Regular") : "Regular");
+      fitMap,
+    ) || ((!isSet && vision?.shape) ? (snapToMap(vision.shape, fitMap) || "Regular") : "Regular");
 
     const closure = snapToMap(
       tagMap["closure"] || tagMap["fastening"] || "",
-      NYKAA_CLOSURE_MAP,
+      isTrousers ? TROUSERS_CLOSURE_MAP : NYKAA_CLOSURE_MAP,
     ) || "Pull On";
+
+    const riseStyle = isTrousers
+      ? (snapToMap(tagMap["rise"] || tagMap["rise_style"] || tagMap["waist_rise"] || "", TROUSERS_RISE_MAP) || "Mid Waist")
+      : "";
 
     // Length in inches from vision
     // For sets: use topLength (kurta top hem); for single garments: use overall length
@@ -649,7 +748,7 @@ export async function fillNykaaTemplates(
       return "Pants";
     })() : "";
 
-    const legStyle = isSet ? (() => {
+    const legStyle = (isSet || isTrousers) ? (() => {
       // 1. Explicit tag
       const explicit = snapToMap(tagMap["leg_style"] || "", NYKAA_LEG_STYLE_MAP);
       if (explicit) return explicit;
@@ -744,7 +843,13 @@ export async function fillNykaaTemplates(
 
       // Pocket description
       const hasPocket = description.toLowerCase().includes("pocket") || (tagMap["pockets"] && tagMap["pockets"] !== "0");
-      if (hasPocket) set("pocket description", "Slit Pocket");
+      if (isTrousers) {
+        const pocketDesc = snapToMap(tagMap["pocket"] || tagMap["pocket_type"] || description, TROUSERS_POCKET_MAP);
+        if (pocketDesc) set("pocket description", pocketDesc);
+        else if (hasPocket) set("pocket description", "Basic 5 Pocket");
+      } else if (hasPocket) {
+        set("pocket description", "Slit Pocket");
+      }
 
       // Sheet-specific fields
       if (isDress) {
@@ -770,6 +875,17 @@ export async function fillNykaaTemplates(
         set("shirts tops and crop tops subcategory", "Tunics");
         set("topwear length", topwearLength);
         set("style bucket", "Fashion");
+      }
+
+      if (isTrousers) {
+        set("leg style", legStyle);
+        set("rise style", riseStyle);
+        const inseam = INSEAM_CHART[size] || INSEAM_CHART["S"];
+        const bottomLen = BOTTOM_LENGTH_CHART[size] || BOTTOM_LENGTH_CHART["S"];
+        set("inseam for garment (inches)", inseam);
+        set("inseam for body (inches)", inseam);
+        set("bottom length for garment (inches)", bottomLen);
+        set("bottom length for body (inches)", bottomLen);
       }
 
       // Garment measurements
@@ -825,6 +941,7 @@ export async function fillNykaaTemplates(
     "Ethnic Dresses": `${datePfx} Nykaa Dresses.xlsx`,
     "Salwar Suits Sets Women Girls": `${datePfx} Nykaa Sets.xlsx`,
     "Tops": `${datePfx} Nykaa Tops.xlsx`,
+    "Trousers": `${datePfx} Nykaa Trousers.xlsx`,
   };
 
   const categoryLabels: Record<NykaaSheet, string> = {
@@ -832,6 +949,7 @@ export async function fillNykaaTemplates(
     "Ethnic Dresses": "Dresses",
     "Salwar Suits Sets Women Girls": "Sets",
     "Tops": "Tops",
+    "Trousers": "Trousers",
   };
 
   const categories: string[] = [];
