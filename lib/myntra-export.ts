@@ -107,6 +107,12 @@ function parseTagMap(tags: string): Record<string, string> {
       map[trimmed.slice(0, colonIdx).trim().toLowerCase()] = trimmed.slice(colonIdx + 1).trim();
     } else {
       map[trimmed.toLowerCase()] = trimmed; // tag is also its own value
+      // Also support "Key_Value" tags (e.g. "Material_Rayon", "Colour_Brown")
+      const underIdx = trimmed.indexOf("_");
+      if (underIdx > 0) {
+        const key = trimmed.slice(0, underIdx).trim().toLowerCase();
+        if (!(key in map)) map[key] = trimmed.slice(underIdx + 1).trim();
+      }
     }
   });
   return map;
@@ -125,6 +131,20 @@ function extractArticleNumber(sku: string): string {
 function extractColourFromTitle(title: string): string {
   const match = title.match(/-\s*(.+)$/);
   return match ? match[1].trim() : "";
+}
+
+/**
+ * Fallback for titles without a " - Colour" suffix, e.g. "Choco Brown Cotton AMPM Pants":
+ * find the first known colour word and keep any words before it that start the title
+ * ("Choco Brown"), as long as it's within the first three words.
+ */
+function extractColourFromTitleWords(title: string): string {
+  const words = title.split(/\s+/);
+  for (let i = 0; i < Math.min(words.length, 3); i++) {
+    const w = words[i].toLowerCase().replace(/[^a-z]/g, "");
+    if (w && COLOUR_MAP.some(([key]) => key === w)) return words.slice(0, i + 1).join(" ");
+  }
+  return "";
 }
 
 /** Simplify a colour name for Prominent Colour: "Transformative Teal" → "Teal", "Off White" → "Off White" */
@@ -417,6 +437,10 @@ const FABRIC_MAP_SETS: [string, string][] = [
   ["pure wool", "Pure Wool"],
   ["wool", "Pure Wool"],
   ["chinon", "Chinon"],
+  ["mul chanderi", "Mul Chanderi"],
+  ["mulmul", "Mulmul"],
+  ["kota", "Pure Cotton"], // Kota Doria isn't in Myntra's list; it's a cotton weave
+  ["khadi", "Khadi"],
 ];
 
 // Ethnic Dresses fabric column has a different allowed set (no "Pure Cotton" — just "Cotton")
@@ -480,7 +504,8 @@ const DRESS_LENGTH_MAP: Record<string, string> = {
 };
 
 function normaliseFabric(raw: string, forSets = false, forDress = false): string {
-  const lower = raw.toLowerCase();
+  // "Kota Doria with Mulmul lining" / "Mulmul with Kota Doria dupatta": the primary fabric comes first
+  const lower = raw.toLowerCase().split(/\s+with\s+/)[0];
   const map = forDress ? FABRIC_MAP_DRESS : forSets ? FABRIC_MAP_SETS : FABRIC_MAP;
   for (const [key, val] of map) {
     if (lower.includes(key)) return val;
@@ -692,7 +717,7 @@ function extractFabric(tagMap: Record<string, string>, description = "", forSets
   const raw = tagMap["fabric"] || tagMap["material"] || tagMap["fabric1"] || "";
   if (raw) return normaliseFabric(raw, forSets, forDress);
   // Fallback: parse "Material XYZ" from description
-  const match = description.match(/\bMaterial\s+([A-Za-z][A-Za-z\s]{1,30}?)(?:\.|,|$)/i);
+  const match = description.match(/\bMaterial\s*:?\s*(?:\d+\s*%\s*)?([A-Za-z][A-Za-z\s]{1,30}?)(?:\.|,|$)/i);
   if (match) return normaliseFabric(match[1].trim(), forSets, forDress);
   // Last resort: scan title for known fabric keywords (longest match first)
   if (title) {
@@ -936,9 +961,10 @@ function getValue(
   const size = (variant.option1 || "S").toUpperCase();
   const measurements = SIZE_CHART[size] || SIZE_CHART["S"];
   // option1 is always size; option2 is colour when the product has a colour option
-  const SIZE_PATTERN = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|\d+)$/i;
+  const SIZE_PATTERN = /^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|6XL|\d+)$/i;
   const colourFromOption = SIZE_PATTERN.test((variant.option1 || "").trim()) ? (variant.option2 || "") : (variant.option1 || "");
-  const colour = extractColourFromTitle(product.title) || colourFromOption;
+  const colour = extractColourFromTitle(product.title) || colourFromOption
+    || extractColourFromTitleWords(product.title) || tagMap["colour"] || tagMap["color"] || "";
   const articleNumber = extractArticleNumber(variant.sku || "");
   const lengthText = extractLength(tagMap, description);
   const frontLength = LENGTH_INCHES[lengthText] || measurements.bust; // fallback
@@ -973,7 +999,26 @@ function getValue(
   if (hl === "articletype") return articleType;
 
   // ── Size ──
+  const isTrousers = articleType.toLowerCase().includes("trouser");
+  // Myntra wants a numeric standard size (waist in inches) for Trousers; use the to-fit waist
+  if (hl === "standard size" && isTrousers && SIZE_CHART[size]) return String(SIZE_CHART[size].toFitWaist);
   if (hl === "brand size" || hl === "standard size") return variant.option1 || "";
+  if (hl === "fit" && isTrousers) {
+    const text = `${tagMap["fit"] || ""} ${product.title} ${description}`.toLowerCase();
+    const TROUSER_FIT: [string, string][] = [
+      ["wide leg", "Wide Leg"], ["wide-leg", "Wide Leg"], ["culotte", "Wide Leg"], ["palazzo", "Wide Leg"],
+      ["bootcut", "Bootcut"], ["boot cut", "Bootcut"], ["jogger", "Jogger"], ["baggy", "Baggy"],
+      ["skinny", "Skinny Fit"], ["slim", "Slim Fit"], ["tapered", "Tapered Fit"], ["tailored", "Tailored Fit"],
+      ["flared", "Flared"], ["relaxed", "Relaxed Fit"], ["loose", "Loose Fit"], ["straight", "Straight Fit"],
+    ];
+    return TROUSER_FIT.find(([k]) => text.includes(k))?.[1] || "Regular Fit";
+  }
+  if (hl === "waist rise" && isTrousers) {
+    const text = `${tagMap["rise"] || tagMap["waist_rise"] || ""} ${product.title} ${description}`.toLowerCase();
+    if (/high[\s-]?(waist|rise)/.test(text)) return "High-Rise";
+    if (/low[\s-]?(waist|rise)/.test(text)) return "Low-Rise";
+    return "Mid-Rise";
+  }
   if (hl === "is standard size present on label") return "Yes";
 
   // ── Colour ──
@@ -1348,6 +1393,108 @@ function buildListViewName(
 
 const SKIP_SHEETS = new Set(["__instructions", "masterdata", "instructions", "readme"]);
 
+// ─── Dropdown validation against the uploaded template ───────────────────────
+//
+// Each Myntra sheet has its own dropdown lists (Trousers has no "Daily" occasion,
+// Co-Ords has no "Flared Sleeves", etc.). Rather than hard-coding every sheet's
+// vocabulary, read the real lists from the template's data-validation rules and
+// snap each value to one the column allows before writing it.
+
+/** Fallbacks for values a column doesn't allow; the first one the column does allow wins. */
+const DROPDOWN_ALIASES: Record<string, string[]> = {
+  // Occasion
+  "daily": ["Casual"], "casual": ["Daily"], "fusion": ["Casual"],
+  "festive": ["Ethnic", "Party"], "wedding": ["Festive", "Ethnic", "Party"], "formal": ["Smart Casual", "Casual"],
+  // Sleeve styling
+  "flared sleeves": ["Bell Sleeves"], "puff sleeves": ["Puffed Sleeves"], "puffed sleeves": ["Puff Sleeves"],
+  // Neck
+  "tie-up neck": ["V-Neck"], "keyhole neck": ["Round Neck"], "mock neck": ["High Neck"],
+  "high neck": ["Mock Neck"], "scoop neck": ["Round Neck"],
+  // Surface styling
+  "embroidered": ["Thread Work", "NA"], "embellished": ["NA"], "sequined": ["Embellished", "NA"],
+  "gathered or pleated": ["Gathers", "NA"], "smocked": ["Gathers", "NA"], "ruffles": ["Frills", "NA"],
+  "tie-ups": ["NA"], "layered": ["NA"],
+  // Length (dresses use Midi/Maxi, trousers use Regular/Three-Fourth)
+  "ankle length": ["Maxi", "Regular"], "floor length": ["Maxi", "Regular"],
+  "calf length": ["Midi", "Three-Fourth Length"], "knee length": ["Cropped"], "above knee": ["Cropped"],
+  // Hemline
+  "curved": ["Straight"], "asymmetric": ["High-Low"], "angular accents": ["Straight"],
+  // Closure
+  "na": ["Slip-On"], "none": ["NA", "Slip-On"], "elastic": ["Slip-On"], "zipper": ["Zip"], "button fly": ["Button"],
+  // Fabric
+  "chanderi cotton": ["Mul Chanderi", "Cotton Blend"], "pure cotton": ["Cotton"], "cotton": ["Pure Cotton"],
+  "mulmul": ["Pure Cotton", "Cotton"], "viscose rayon": ["Rayon"], "rayon": ["Viscose Rayon"],
+  "shantoon": ["Viscose Rayon"], "santoon": ["Viscose Rayon"],
+  // Garment types
+  "kurta": ["Tunic", "Top"], "palazzo": ["Palazzos"],
+  // Colour
+  "fuschia": ["Fuchsia"], "multi-color": ["Multi"], "multicolour": ["Multi"], "multicolor": ["Multi"],
+};
+
+function colLettersToNumber(letters: string): number {
+  return letters.split("").reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0);
+}
+
+/** Resolve a list formula like "masterdata!$X$2:$X$54" or "\"A,B,C\"" to its values. */
+function resolveListFormula(wb: ExcelJS.Workbook, formula: string, cache: Map<string, string[]>): string[] {
+  const cached = cache.get(formula);
+  if (cached) return cached;
+  let vals: string[] = [];
+  const inline = formula.match(/^"(.*)"$/);
+  if (inline) {
+    vals = inline[1].split(",").map((v) => v.trim()).filter(Boolean);
+  } else {
+    const m = formula.match(/^'?([^'!]+)'?!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/);
+    const src = m ? wb.getWorksheet(m[1]) : undefined;
+    if (m && src) {
+      const col = colLettersToNumber(m[2]);
+      for (let r = Number(m[3]); r <= Number(m[5]); r++) {
+        const v = src.getRow(r).getCell(col).value;
+        if (v !== null && v !== undefined && String(v).trim()) vals.push(String(v).trim());
+      }
+    }
+  }
+  cache.set(formula, vals);
+  return vals;
+}
+
+/** Map of 1-based column number → allowed dropdown values for that column. */
+function readSheetDropdowns(wb: ExcelJS.Workbook, ws: ExcelJS.Worksheet, cache: Map<string, string[]>): Map<number, string[]> {
+  const out = new Map<number, string[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const model = (ws as any).dataValidations?.model as Record<string, { type?: string; formulae?: string[] }> | undefined;
+  if (!model) return out;
+  for (const [addr, dv] of Object.entries(model)) {
+    if (dv?.type !== "list" || !dv.formulae?.[0]) continue;
+    const m = addr.match(/^([A-Z]+)\d+/);
+    if (!m) continue;
+    const col = colLettersToNumber(m[1]);
+    if (out.has(col)) continue;
+    const vals = resolveListFormula(wb, dv.formulae[0], cache);
+    if (vals.length) out.set(col, vals);
+  }
+  return out;
+}
+
+/** Snap a value to the column's dropdown: exact (any case) → alias → "Regular"↔"Regular Fit" style match. */
+export function snapToDropdown(value: string, allowed: string[]): string {
+  const lower = value.trim().toLowerCase();
+  const byLower = new Map(allowed.map((a) => [a.toLowerCase(), a]));
+  const exact = byLower.get(lower);
+  if (exact) return exact;
+  for (const alt of DROPDOWN_ALIASES[lower] || []) {
+    const hit = byLower.get(alt.toLowerCase());
+    if (hit) return hit;
+  }
+  if (lower.length >= 4) {
+    const near = allowed
+      .filter((a) => { const al = a.toLowerCase(); return al.startsWith(lower + " ") || lower.startsWith(al + " "); })
+      .sort((a, b) => a.length - b.length);
+    if (near.length) return near[0];
+  }
+  return value; // no safe match — leave as-is so it's visible rather than silently wrong
+}
+
 export async function fillMyntraTemplate(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   templateBuffer: any,
@@ -1394,7 +1541,9 @@ export async function fillMyntraTemplate(
     wb.removeWorksheet(ws.id);
   }
 
+  const dropdownCache = new Map<string, string[]>();
   for (const { ws, products: unsortedProducts, sheetName } of bySheet.values()) {
+    const dropdowns = readSheetDropdowns(wb, ws, dropdownCache);
     // Sort products by VAN number ascending (BM2065 → BM2066 → BM2067)
     const sheetProducts = [...unsortedProducts].sort((a, b) => {
       const vanA = extractArticleNumber(a.variants[0]?.sku || "");
@@ -1466,7 +1615,9 @@ export async function fillMyntraTemplate(
         const row = ws.getRow(nextRow++);
         headers.forEach((h, i) => {
           if (!h) return;
-          const val = getValue(h, product, variant, tagMap, imageUrls, styleGroupId, sheetName, description, vision, baseMrp, baseIsp, colorGroupMap.get(product.id) || extractArticleNumber(product.variants[0]?.sku || ""), meta);
+          let val = getValue(h, product, variant, tagMap, imageUrls, styleGroupId, sheetName, description, vision, baseMrp, baseIsp, colorGroupMap.get(product.id) || extractArticleNumber(product.variants[0]?.sku || ""), meta);
+          const allowed = dropdowns.get(i + 1);
+          if (allowed && typeof val === "string" && val) val = snapToDropdown(val, allowed);
           const cell = row.getCell(i + 1);
           if (val !== null && val !== "") {
             if (typeof val === "object" && "hyperlink" in val) {
