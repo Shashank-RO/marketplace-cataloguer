@@ -250,8 +250,32 @@ export async function fetchProductsFiltered(
 }
 
 export async function fetchProduct(id: string, token?: string): Promise<ShopifyProduct> {
-  const res = await shopifyFetch(`products/${id}.json`, token);
-  if (!res.ok) throw new Error(`Shopify error ${res.status}`);
-  const data = await res.json();
-  return data.product;
+  // Shopify's REST API allows a burst of ~40 calls, then ~2/sec. On 429, wait the
+  // Retry-After it gives us and try again rather than failing the whole export.
+  const MAX_RETRIES = 8;
+  for (let attempt = 0; ; attempt++) {
+    const res = await shopifyFetch(`products/${id}.json`, token);
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get("retry-after")) || 2;
+      await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Shopify error ${res.status}`);
+    const data = await res.json();
+    return data.product;
+  }
+}
+
+/** Fetch many products with limited concurrency so large exports stay under Shopify's rate limit. */
+export async function fetchProductsByIds(ids: string[], token?: string, concurrency = 4): Promise<ShopifyProduct[]> {
+  const results: ShopifyProduct[] = new Array(ids.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < ids.length) {
+      const i = next++;
+      results[i] = await fetchProduct(ids[i], token);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+  return results;
 }

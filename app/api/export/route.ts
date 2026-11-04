@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchProduct } from "@/lib/shopify";
+import { fetchProductsByIds } from "@/lib/shopify";
 import { buildMyntraWorkbook } from "@/lib/myntra-template";
 import { fillMyntraTemplate } from "@/lib/myntra-export";
 import { getToken, refreshToken } from "@/lib/token-store";
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     let token = await getToken();
 
     const fetchAll = async (t: string) =>
-      Promise.all(productIds.map((id: string) => fetchProduct(id, t)));
+      fetchProductsByIds(productIds, t);
 
     let products;
     try {
