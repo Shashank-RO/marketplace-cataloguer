@@ -1427,6 +1427,8 @@ const DROPDOWN_ALIASES: Record<string, string[]> = {
   "shantoon": ["Viscose Rayon"], "santoon": ["Viscose Rayon"],
   // Garment types
   "kurta": ["Tunic", "Top"], "palazzo": ["Palazzos"],
+  // Design styling: yoke is print/embroidery placement, not a cut
+  "yoke design": ["Regular"],
   // Colour
   "fuschia": ["Fuchsia"], "multi-color": ["Multi"], "multicolour": ["Multi"], "multicolor": ["Multi"],
 };
