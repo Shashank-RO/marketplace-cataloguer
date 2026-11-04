@@ -549,7 +549,7 @@ function getSheetForProductType(productType: string): NykaaSheet | null {
   }
   if (pt.includes("dress")) return "Ethnic Dresses";
   if (pt === "tops" || pt === "top" || pt === "tunic" || pt === "tunics") return "Tops";
-  if (pt.includes("trouser") || pt.includes("pant")) return "Trousers";
+  if (pt.includes("trouser") || pt.includes("pant") || pt === "bottoms" || pt === "bottom") return "Trousers";
   return null;
 }
 
@@ -567,7 +567,7 @@ function getPackContains(productType: string): string {
   if (pt.includes("set") || pt.includes("co-ord") || pt.includes("coord")) return "1 Kurta 1 Pant";
   if (pt.includes("dress")) return "1 Dress";
   if (pt === "tops" || pt === "top" || pt.includes("tunic")) return "1 Top";
-  if (pt.includes("trouser") || pt.includes("pant")) return "1 Trouser";
+  if (pt.includes("trouser") || pt.includes("pant") || pt === "bottoms" || pt === "bottom") return "1 Trouser";
   return "1 Kurta";
 }
 

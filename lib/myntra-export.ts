@@ -58,6 +58,13 @@ const SHEET_OVERRIDES: Record<string, string[]> = {
   "kurta sets":   ["Kurta Sets", "Kurta Set"],
   "tops":         ["Tunics", "Tops / Tunics", "Tops"],
   "top":          ["Tunics", "Tops / Tunics", "Tops"],
+  // Standalone bottomwear: Myntra calls this category "Trousers"
+  "bottoms":      ["Trousers", "Bottoms"],
+  "bottom":       ["Trousers", "Bottoms"],
+  "pants":        ["Trousers", "Bottoms"],
+  "pant":         ["Trousers", "Bottoms"],
+  "trousers":     ["Trousers", "Bottoms"],
+  "trouser":      ["Trousers", "Bottoms"],
 };
 
 function norm(s: string): string {
