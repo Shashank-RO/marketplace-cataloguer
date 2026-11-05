@@ -54,6 +54,15 @@ export function thumbSrc(src: string, size = "400x400"): string {
   return src.replace(/(\.[a-z]+)(\?.*)?$/i, `_${size}$1$2`);
 }
 
+/**
+ * Return a URL that serves the image as JPEG. Renaming ".png" to ".jpg" in a Shopify
+ * CDN path gives a 404; asking the CDN for format=jpg on the real path works.
+ */
+export function shopifyJpgUrl(src: string): string {
+  if (!/\.png(\?|$)/i.test(src)) return src;
+  return src + (src.includes("?") ? "&" : "?") + "format=jpg";
+}
+
 export async function fetchProducts(
   cursor?: string,
   limit = 50,

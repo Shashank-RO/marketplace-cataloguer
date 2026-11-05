@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { ShopifyProduct } from "./shopify";
+import { ShopifyProduct, shopifyJpgUrl } from "./shopify";
 import { runVisionBatch, VisionAttributes } from "./vision";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1601,9 +1601,8 @@ export async function fillMyntraTemplate(
       const description = stripHtml(product.body_html);
       // Use original full-resolution image URLs (strip thumbnail suffix)
       const imageUrls = product.images.map((img) =>
-        img.src
-          .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")
-          .replace(/\.png(\?.*)?$/i, ".jpg$1"), // Myntra requires jpg; Shopify CDN serves png as jpg too
+        // Myntra requires jpg: ask Shopify's CDN to convert (renaming .png to .jpg 404s)
+        shopifyJpgUrl(img.src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")),
       );
 
       const vision = visionMap.get(product.id) ?? null;

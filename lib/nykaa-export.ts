@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { runVisionBatch } from "./vision";
-import type { ShopifyProduct } from "./shopify";
+import { type ShopifyProduct, shopifyJpgUrl } from "./shopify";
 import { cloudinaryFetchUrl } from "./cloudinary";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -620,8 +620,8 @@ export async function fillNykaaTemplates(
   const visionMap = await runVisionBatch(
     products,
     (product) => product.images[0]?.src
-      .replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")
-      .replace(/\.png(\?.*)?$/i, ".jpg$1") || "",
+      ? shopifyJpgUrl(product.images[0].src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || ""))
+      : "",
     options.skipVision,
   );
 
@@ -644,8 +644,7 @@ export async function fillNykaaTemplates(
     const description = stripHtml(product.body_html || "");
     const productType = product.product_type || "";
     const imageUrls = product.images.map((img) =>
-      img.src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")
-               .replace(/\.png(\?.*)?$/i, ".jpg$1")
+      shopifyJpgUrl(img.src.replace(/_\d+x\d+(\.[a-z]+(\?.*)?)?$/i, (m, ext) => ext || "")),
     );
 
     // Vision result pre-fetched in parallel above
