@@ -55,12 +55,12 @@ export function thumbSrc(src: string, size = "400x400"): string {
 }
 
 /**
- * Return a URL that serves the image as JPEG. Renaming ".png" to ".jpg" in a Shopify
- * CDN path gives a 404; asking the CDN for format=jpg on the real path works.
+ * Return a URL that serves the image as JPEG and ends in ".jpg" (Myntra checks the
+ * extension in the URL, not the file). Renaming ".png" to ".jpg" 404s on Shopify's
+ * CDN, but appending ".jpg" ("x.png.jpg") makes the CDN convert to full-size JPEG.
  */
 export function shopifyJpgUrl(src: string): string {
-  if (!/\.png(\?|$)/i.test(src)) return src;
-  return src + (src.includes("?") ? "&" : "?") + "format=jpg";
+  return src.replace(/\.png(\?|$)/i, ".png.jpg$1");
 }
 
 export async function fetchProducts(
