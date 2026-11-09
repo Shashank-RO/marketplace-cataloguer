@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { runVisionBatch } from "./vision";
 import { type ShopifyProduct, shopifyJpgUrl } from "./shopify";
 import { cloudinaryFetchUrl } from "./cloudinary";
+import { readSheetDropdowns, snapToDropdown } from "./dropdowns";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -606,6 +607,10 @@ export async function fillNykaaTemplates(
   // Track which sheets got data
   const sheetsUsed = new Set<NykaaSheet>();
 
+  // Each template's own dropdown lists (column number → allowed values), read once per sheet
+  const dropdownCache = new Map<string, string[]>();
+  const sheetDropdowns = new Map<NykaaSheet, Map<number, string[]>>();
+
   // Pre-compute Design Code groups: products sharing the same base title (strip " - Colour" suffix)
   // get the same Design Code — the VAN of the first product in that group.
   const designCodeMap = new Map<string, string>(); // productId → groupVAN
@@ -634,6 +639,8 @@ export async function fillNykaaTemplates(
     const wb = workbooks[sheetName];
     const ws = wb.getWorksheet(sheetName);
     if (!ws) continue;
+    if (!sheetDropdowns.has(sheetName)) sheetDropdowns.set(sheetName, readSheetDropdowns(wb, ws, dropdownCache));
+    const dropdowns = sheetDropdowns.get(sheetName)!;
 
     // Build header→col map from row 3
     const headerRow = ws.getRow(3);
@@ -803,7 +810,9 @@ export async function fillNykaaTemplates(
 
       function set(header: string, value: string | number | null) {
         const col = colMap[header.toLowerCase().trim()];
-        if (col && value !== null && value !== "") row.getCell(col).value = value;
+        if (!col || value === null || value === "") return;
+        const allowed = dropdowns.get(col);
+        row.getCell(col).value = allowed && typeof value === "string" ? snapToDropdown(value, allowed) : value;
       }
 
       set("vendor sku code", sku);
