@@ -142,6 +142,8 @@ const NYKAA_FABRIC_MAP: [string, string][] = [
   ["acrylic", "Acrylic"],
   ["modal satin", "Modal"],
   ["modal", "Modal"],
+  ["kota silk", "Kota Silk"],
+  ["kota", "Kota"], // "Kota Doria" isn't in Nykaa's Material list; "Kota" is (checked before "cotton")
   ["pure cotton", "Cotton"],
   ["slub cotton", "Cotton"], ["mul cotton", "Cotton"], ["mulmul", "Cotton"],
   ["cotton blend", "Cotton"], ["cotton", "Cotton"],
